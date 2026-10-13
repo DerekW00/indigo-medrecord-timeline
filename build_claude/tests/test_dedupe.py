@@ -181,11 +181,11 @@ def test_blank_or_tiny_records_never_pair():
 
 def test_near_pairs_do_not_chain_into_one_group():
     a = rec("a", " ".join(f"token{n}" for n in range(100)))
-    b = rec("b", " ".join(f"token{n}" for n in range(10, 110)))
-    c = rec("c", " ".join(f"token{n}" for n in range(20, 120)))
-    assert dedupe.candidate_score(a, b) >= 0.8
-    assert dedupe.candidate_score(b, c) >= 0.8
-    assert dedupe.candidate_score(a, c) < 0.8
+    b = rec("b", " ".join(f"token{n}" for n in range(7, 107)))
+    c = rec("c", " ".join(f"token{n}" for n in range(14, 114)))
+    assert dedupe.candidate_score(a, b) >= dedupe.NEAR_THRESHOLD
+    assert dedupe.candidate_score(b, c) >= dedupe.NEAR_THRESHOLD
+    assert dedupe.candidate_score(a, c) < dedupe.NEAR_THRESHOLD
     rows = confirmed([a, b, c])
     assert {r["record_id"] for r in rows} == {"a", "b"}
     assert {r["group_id"] for r in rows} == {"a"}

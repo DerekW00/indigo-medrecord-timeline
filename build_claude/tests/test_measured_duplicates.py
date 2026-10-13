@@ -220,6 +220,16 @@ def test_confirmation_budget_caps_calls_and_never_retries_reversed_pair(monkeypa
 
 
 @pytest.mark.parametrize("score,expected", [(0.8, False), (0.849999, False), (0.85, True), (0.96, True)])
+def test_affirmative_confirmation_cannot_bypass_point85_candidate_threshold(monkeypatch, score, expected):
+    a, b = near_pair()
+    monkeypatch.setattr(dedupe, "candidate_score", lambda *_: score)
+    rows = dedupe.find_duplicates([a, b], confirmations={("a", "b"): decision(a, b)})
+    assert bool(rows) is expected
+    if rows:
+        assert all(row["reason"] == "similar_confirmed" for row in rows)
+
+
+@pytest.mark.parametrize("score,expected", [(0.8, False), (0.849999, False), (0.85, True), (0.96, True)])
 def test_valid_uncertain_fallback_has_inclusive_point85_threshold(monkeypatch, score, expected):
     a, b = near_pair()
     monkeypatch.setattr(dedupe, "candidate_score", lambda *_: score)

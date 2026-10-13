@@ -23,7 +23,7 @@ from .prompts_util import load_prompt
 
 log = logging.getLogger(__name__)
 
-NEAR_THRESHOLD = 0.8   # Candidate only: confirmation is mandatory
+NEAR_THRESHOLD = 0.85  # Candidate only: confirmation is mandatory
 UNCERTAIN_THRESHOLD = 0.85  # Explicit uncertainty may qualify under the F2 rule
 SHINGLE_SIZE = 3       # words per shingle
 MIN_WORDS = 8          # shorter normalized texts (blank or failed pages) never take part

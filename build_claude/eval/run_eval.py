@@ -3,8 +3,9 @@
 
     python eval/run_eval.py --doc-id <id or prefix> [--filename record_1.pdf] [--gold path] [--judge]
 
-Boundary, date, type and duplicate metrics need a gold file (eval/gold/<stem>.json; make a
-draft with scripts/export_gold.py). The date rule check runs on every summary without gold.
+Boundary, date, type and duplicate metrics use the repository's adopted gold file
+(../eval/gold/<stem>.json from build_claude). Pass --gold to evaluate a separate draft.
+The date rule check runs on every summary without gold.
 --judge sends each summary with its transcription to the model (app/prompts/summary_judge.md).
 """
 from __future__ import annotations
@@ -22,7 +23,8 @@ sys.path.insert(0, str(ROOT))
 from app import config, db  # noqa: E402
 from eval import metrics as M  # noqa: E402
 
-GOLD_DIR = ROOT / "eval" / "gold"
+# Human-adopted labels live at the repository root, outside the app's old snapshots.
+GOLD_DIR = ROOT.parent / "eval" / "gold"
 RESULTS_DIR = ROOT / "eval" / "results"
 PROMPT_PATH = ROOT / "app" / "prompts" / "summary_judge.md"
 JUDGE_SYSTEM = ("You check a summary against the source transcription of a medical record. "
@@ -248,7 +250,7 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--doc-id", help="document id (sha256 hex) or a unique prefix of it")
     ap.add_argument("--filename", help="document filename; finds the document when --doc-id is absent")
-    ap.add_argument("--gold", help="gold file path (default eval/gold/<filename stem>.json)")
+    ap.add_argument("--gold", help="gold file path (default repository-root eval/gold/<filename stem>.json)")
     ap.add_argument("--judge", action="store_true", help="also judge every summary with the model")
     ap.add_argument("--out", help="results path (default eval/results/<doc-id>.json)")
     args = ap.parse_args(argv)

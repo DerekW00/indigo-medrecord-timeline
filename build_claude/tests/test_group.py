@@ -90,6 +90,164 @@ class TestFaxId:
         assert fax_id("") is None
         assert fax_id("PAGE 2/005") is None
         assert fax_id("  2/6 ") is None
+        assert fax_id("Received by TPA ICS Fax 10/30/25") is None   # the TPA stamp alone is not a fax header
+
+    def test_more_timestamp_spellings_seen_in_the_sample(self):
+        assert fax_id("From ttyS6 PR 01 Apr 2025 11:22:56 AM PDT Page 4 of 8") == "20250401-112256"
+        assert fax_id("From ttyS6 PHB 2025-04-01T11:22:56-07:00 Page 6 of 8") == "20250401-112256"
+        assert fax_id("12/6/2024 12:07:36 AM PST PAGE 2/006 Fax Server") == "20241206-000736"
+        assert fax_id("2024-12-06T00:07:36-08:00 PAGE 3/006 Fax Server") == "20241206-000736"
+        assert fax_id("KPRFCO04 2025-05-05 12:16:13 PM PDT PAGE 2/006") == "20250505-121613"
+        assert fax_id("Oct/06/2024 11:40:12 AM Kaiser 2/58") == "20241006-114012"
+
+    def test_bare_page_token_and_date_only_headers(self):
+        # Sample page 158: the page number after PAGE is cut off.
+        assert fax_id("KPRFCCO002 10/7/2024 4:45:31 PM PDT PAGE") == "20241007-164531"
+        assert fax_id("KPRFDT001 PAGE") == "KPRFDT001"
+        assert fax_id("10/30/2025 Fax Server") == "20251030"
+
+
+# ---------- fax header noise inside one transmission (rules 1 and 5) ----------
+
+def test_station_name_drift_sample_pages_1_4():
+    # "Kaiser" is cut off at the page edge on later pages; the stamp is the same.
+    headers = ["Dec/29/2025 2:01:57 PM Kaiser 2/6", "Dec/29/2025 2:01:57 PM Kaiser 3/6",
+               "Dec/29/2025 2:01:57 PM Kaise 4/6", "Dec/29/2025 2:01:57 PM Kaise 5/6"]
+    pages = [pg(new=(k == 2), conf="high", header=h, k=k, n=6, dtype="permanent_stationary_report",
+                date="2025-12-29") for h, k in zip(headers, (2, 3, 4, 5))]
+    spans = group_pages(pages)
+    assert spans_of(pages) == [(1, 4)]
+    assert spans[0].partial_start is False
+
+
+def test_tpa_stamp_read_on_one_page_only():
+    headers = ["Dec/29/2025 2:01:57 PM Kaiser 2/6 | Received by TPA ICS Fax 12/29/25",
+               "Dec/29/2025 2:01:57 PM Kaise[r] 3/6", "Dec/29/2025 2:01:57 PM Kaiser 4/6",
+               "Dec/29/2025 2:01:57 PM Kaiser 5/6"]
+    pages = [pg(new=(k == 2), conf="high", header=h, k=k, n=6, dtype="permanent_stationary_report",
+                date="2025-12-29") for h, k in zip(headers, (2, 3, 4, 5))]
+    assert spans_of(pages) == [(1, 4)]
+    assert len({fax_id(h) for h in headers}) == 1
+
+
+def test_timestamp_spellings_with_repeated_letterhead_sample_157_165():
+    # One fax, the model writes the stamp five ways and flags a new record on most pages.
+    stamps = ["2024-10-07 16:45:31 PDT", "10/7/2024 4:45:31 PM PDT", "2024-10-07T16:45:31-07:00",
+              "2024-10-07 4:45:31 PM PDT", "Oct 7, 2024 4:45:31 PM", "10/7/2024 4:45:31 PM PDT"]
+    pages = [pg(new=(k != 5), conf="high", header=f"KPRFCCO002 {s} PAGE {k}/010 Fax Server", k=k, n=10,
+                dtype="operative_report", date="2024-10-02") for s, k in zip(stamps, range(2, 8))]
+    assert spans_of(pages) == [(1, 6)]
+
+
+def test_header_without_page_number_chains_sample_157_159():
+    pages = [pg(new=True, conf="high", header="KPRFCCO002 10/7/2024 4:45:31 PM PDT PAGE 2/010 Fax Server", k=2, n=10,
+                dtype="operative_report", date="2024-10-02"),
+             pg(new=True, conf="high", header="KPRFCCO002 10/7/2024 4:45:31 PM PDT PAGE",                   # no k
+                dtype="operative_report", date="2024-10-02"),
+             pg(new=True, conf="high", header="KPRFCCO002 10/7/2024 4:45:31 PM PDT PAGE 4/010 Fax Server", k=4, n=10,
+                dtype="operative_report", date="2024-10-02"),
+             pg(header="KPRFCCO002 10/7/2024 4:45:31 PM PDT PAGE 5/010 Fax Server", k=5, n=10,
+                dtype="operative_report", date="2024-10-02")]
+    spans = group_pages(pages)
+    assert spans_of(pages) == [(1, 4)]
+    assert spans[0].partial_start is False
+
+
+def test_cut_off_header_on_the_first_page_sample_13_14():
+    # Page 13 keeps only the tail of the stamp; the counter and the form labels continue.
+    pages = [pg(new=True, conf="high", header=":47 PM PDT PAGE 2/006 Fax Server", k=2, n=6, label=1, date="2025-08-19"),
+             pg(header="PROD_RDS257 8/20/2025 3:46:47 PM PDT PAGE 3/006 Fax Server", k=3, n=6, label=2, date="2025-08-19"),
+             pg(header="PROD_RDS257 8/20/2025 3:46:47 PM PDT PAGE 4/006 Fax Server", k=4, n=6, label=3, date="2025-08-19")]
+    assert spans_of(pages) == [(1, 3)]
+    # Without page labels the continuing counter alone keeps the pages together.
+    for p in pages:
+        p.page_label = None
+    assert spans_of(pages) == [(1, 3)]
+    # A truncated time without AM/PM still matches the full time of the next page.
+    pages[0].fax_header = "PROD_RDS257 8/20/2025 3:46"
+    pages[0].fax_page = None
+    assert spans_of(pages) == [(1, 3)]
+
+
+def test_fax_counter_continues_across_a_real_header_change_sample_79_83():
+    # A second transmission seven minutes later picks up at fax page 6 of 8 (no form labels here).
+    pages = [pg(new=(k == 4), conf="high", header=f"From ttyS7 Fri 01 Nov 2024 10:26:26 AM PDT Page {k} of 8",
+                k=k, n=8, date="2024-10-29") for k in (4, 5)]
+    pages += [pg(header=f"From ttyS5 Fri 01 Nov 2024 10:33:34 AM PDT Page {k} of 8", k=k, n=8, date="2024-10-29")
+              for k in (6, 7, 8)]
+    assert fax_id(pages[0].fax_header) != fax_id(pages[2].fax_header)
+    spans = group_pages(pages)
+    assert spans_of(pages) == [(1, 5)]
+    assert spans[0].partial_start is False
+
+
+def test_counter_fallback_needs_the_same_total_and_date():
+    first = pg(new=True, conf="high", fax=FAX_A, k=3, n=5, date="2025-10-30")
+    spans = group_pages([first, pg(fax=FAX_B, k=4, n=6, date="2025-10-30")])          # other total
+    assert [(s.start_page, s.end_page) for s in spans] == [(1, 1), (2, 2)]
+    assert spans[1].boundary_reason.startswith("fax transmission changed")
+    spans = group_pages([first, pg(fax=FAX_B, k=4, n=5, date="2025-11-14")])          # other service date
+    assert [(s.start_page, s.end_page) for s in spans] == [(1, 1), (2, 2)]
+    assert spans[1].partial_start is True
+
+
+def test_header_that_lost_its_date_is_not_a_transmission_change():
+    first = pg(new=True, conf="high", fax=FAX_A, k=3, n=5, date="2025-10-30")
+    # Counter continues: one fax.
+    assert spans_of([first, pg(header="PROD PAGE 4/005 Fax Server", k=4, n=5, date="2025-10-30")]) == [(1, 2)]
+    # Counter restarted: a new transmission even though only one header carries a date.
+    spans = group_pages([first, pg(header="PROD PAGE 2/005 Fax Server", k=2, n=5, date="2025-10-30")])
+    assert [(s.start_page, s.end_page) for s in spans] == [(1, 1), (2, 2)]
+    assert spans[1].boundary_reason.startswith("fax transmission changed")
+
+
+def test_restart_at_fax_page_one_wins_even_with_an_equal_stamp():
+    pages = fax(FAX_A, 3) + [pg(new=True, conf="high", fax=FAX_A, k=1, n=2), pg(fax=FAX_A, k=2, n=2)]
+    spans = group_pages(pages)
+    assert spans_of(pages) == [(1, 3), (4, 5)]
+    assert spans[1].boundary_reason == "fax restart 1/2"
+
+
+# ---------- sample pages 153 to 156: one note printed twice inside one fax (rule 3) ----------
+
+def test_same_note_printed_twice_inside_one_fax_sample_153_156():
+    stamp = "KPRFDT001 10/11/2024 10:31 AM"
+    pages = [pg(new=True, conf="high", fax=stamp, k=20, n=25, dtype="hospital_record", date="2024-10-02"),
+             pg(fax=stamp, k=21, n=25, label=2, dtype="hospital_record", date="2024-10-02"),
+             pg(new=True, conf="high", fax=stamp, k=22, n=25, dtype="hospital_record", date="2024-10-02"),
+             pg(fax=stamp, k=23, n=25, label=2, dtype="hospital_record", date="2024-10-02")]
+    spans = group_pages(pages)
+    assert spans_of(pages) == [(1, 2), (3, 4)]
+    assert spans[1].boundary_reason == "new document inside the same fax (page label restarts after page 2)"
+    assert not any(s.partial_start for s in spans)
+    # The same with an explicit "Page 1" on both first pages.
+    pages[0].page_label = pages[2].page_label = FaxPage(k=1)
+    assert spans_of(pages) == [(1, 2), (3, 4)]
+
+
+def test_page_label_restart_needs_a_confident_heading():
+    stamp = "KPRFDT001 10/11/2024 10:31 AM"
+    pages = [pg(new=True, conf="high", fax=stamp, k=20, n=25, label=1, dtype="hospital_record", date="2024-10-02"),
+             pg(fax=stamp, k=21, n=25, label=2, dtype="hospital_record", date="2024-10-02"),
+             pg(new=True, conf="medium", fax=stamp, k=22, n=25, label=1, dtype="hospital_record", date="2024-10-02"),
+             pg(fax=stamp, k=23, n=25, label=2, dtype="hospital_record", date="2024-10-02")]
+    assert spans_of(pages) == [(1, 4)]
+    pages[2].starts_new_record = False
+    assert spans_of(pages) == [(1, 4)]
+
+
+def test_repeated_letterhead_with_continuing_or_missing_labels_still_holds():
+    # Labels 1, 2, 3 with a letterhead on every page: no restart, one record.
+    pages = [pg(new=True, conf="high", fax=FAX_A, k=k, n=6, label=k - 1, date="2025-10-30") for k in (2, 3, 4)]
+    assert spans_of(pages) == [(1, 3)]
+    # No labels at all (sample pages 66-70, 157-165): nothing to restart, one record.
+    pages = [pg(new=True, conf="high", fax=FAX_A, k=k, n=6, date="2025-10-30") for k in (2, 3, 4)]
+    assert spans_of(pages) == [(1, 3)]
+    # An unlabeled page after "Page 2" with a medium-confidence heading: still one record.
+    pages = [pg(new=True, conf="high", fax=FAX_A, k=2, n=6, date="2025-10-30"),
+             pg(fax=FAX_A, k=3, n=6, label=2, date="2025-10-30"),
+             pg(new=True, conf="medium", fax=FAX_A, k=4, n=6, date="2025-10-30")]
+    assert spans_of(pages) == [(1, 3)]
 
 
 # ---------- basic shapes ----------
@@ -461,3 +619,29 @@ def test_group_document_replaces_stale_records(temp_db):
     assert [(r["start_page"], r["end_page"]) for r in new] == [(1, 2), (3, 4)]
     assert {r["id"] for r in db.get_records(doc)} == {r["id"] for r in new}
     assert db.get_record(old[0]["id"]) is None
+
+
+def test_printed_first_second_page_pair_survives_type_and_opaque_fax_drift():
+    pages = [pg(new=True, conf="high", header="FAX ALPHA", k=8, n=12,
+                label=1, dtype="hospital_record", date="2026-01-08"),
+             pg(header="FAX BETA", label=2, dtype="consultation", date="2026-01-08")]
+    assert spans_of(pages) == [(1, 2)]
+    pages[1].date_of_service = None
+    assert spans_of(pages) == [(1, 2)]
+
+
+@pytest.mark.parametrize("change", ["heading", "date", "reset", "label_gap"])
+def test_printed_pair_fallback_preserves_real_boundaries(change):
+    first = pg(new=True, conf="high", header="FAX ALPHA", k=8, n=12,
+               label=1, dtype="hospital_record", date="2026-01-08")
+    second = pg(header="FAX BETA", label=2, dtype="consultation", date="2026-01-08")
+    if change == "heading":
+        second.starts_new_record = True
+        second.boundary_confidence = "high"
+    elif change == "date":
+        second.date_of_service = "2026-01-09"
+    elif change == "reset":
+        second.fax_page = FaxPage(k=1, n=12)
+    else:
+        second.page_label = FaxPage(k=3)
+    assert spans_of([first, second]) == [(1, 1), (2, 2)]

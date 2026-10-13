@@ -44,9 +44,16 @@ One background worker processes documents in order; calls within a document run 
 | Feature | Delivered behavior |
 |---|---|
 | Editing | Save title, date, type, provider, and summary; edits survive restart; Reset restores model fields |
+| PDF removal | Remove a completed or failed PDF after confirmation; its stored copy, pages, records, and edits are removed; remaining duplicates are refreshed |
 | Retry | Per-page checkpoints, startup resume, and an injected-failure demo |
 | Duplicates | Exact partial copies and near copies collapse; all source pages remain accessible |
 | Evaluation | Adopted gold, boundary/date/type/duplicate metrics, date-presence rules, and a claim judge |
+
+Use **Remove** beside a PDF to remove it from this workspace. Cancel leaves it
+unchanged. Removal is unavailable while a PDF is queued or processing; wait for it
+to finish or fail. Your original file remains on your computer, and other PDFs and
+their reviewer edits remain in the workspace. Uploading the removed file again
+starts processing it again.
 
 The single canonical gold file is [repository-root eval/gold/record_1.json](../eval/gold/record_1.json); it is the evaluator's default. Derek adopted its 31 records and verified pages 37–41 as one record. The final handoff reports that gold boundaries were independently confirmed by a blind sweep; the stopped review's full synthesis was not available. Labels were not changed to improve scores.
 
@@ -92,7 +99,7 @@ MRT_DATA_DIR="$PWD/data/checks" MRT_TEST_SCRATCH_ROOT="$PWD/data/checks" \
 .venv/bin/python -m scripts.clean_checkout_smoke --repo .. --commit "$(git rev-parse HEAD)"
 ```
 
-The smoke clones the committed candidate, installs its own dependencies with `uv`, uploads two synthetic PDFs, checks source JPEGs and edit/restart/reset, and verifies Retry preserves completed pages and summaries. Full sample browser checks additionally need `MRT_UI_DATA_SOURCE` pointing to a disposable source copy and `MRT_UI_EXPECT_DUPLICATE_GROUPS=2`.
+The smoke clones the committed candidate, installs its own dependencies with `uv`, uploads two synthetic PDFs, checks source JPEGs and edit/restart/reset, verifies Retry preserves completed pages and summaries, and checks PDF removal across a restart while retaining the other PDFs. Full sample browser checks additionally need `MRT_UI_DATA_SOURCE` pointing to a disposable source copy and `MRT_UI_EXPECT_DUPLICATE_GROUPS=2`.
 
 Evaluate an idle copy of the processed sample, without extraction:
 

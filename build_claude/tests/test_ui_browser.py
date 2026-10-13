@@ -356,7 +356,7 @@ def test_calendar_dates_detail_clamp_and_progress_labels(browser):
             documents[0]['status'] = status
             expect(page.locator('#doc-list .stage')).to_have_text(label)
             row = page.locator('#doc-list .stage').locator('..')
-            expect(row).to_have_text(label + ('3/12Retry' if status in ('failed', 'interrupted') else ''))
+            expect(row).to_have_text(label + ('3/12Retry' if status in ('failed', 'interrupted') else '') + 'Remove')
         assert server.calls() == {}
         page.close()
 
@@ -426,5 +426,152 @@ def test_duplicate_badge_waits_for_pending_timeline_and_preserves_filters(browse
         expect(page.locator('.card[data-id=copy]')).to_be_focused()
         expect(page.locator('#filter-dups')).to_be_checked()
         expect(page.locator('[name=title]')).to_have_value('Unsaved selection stays intact')
+        assert server.calls() == {}
+        page.close()
+
+
+def test_new_filter_choice_cancels_pending_duplicate_navigation(browser):
+    from playwright.sync_api import expect
+    from urllib.parse import parse_qs, urlparse
+
+    with scratch('copy-filter-race-') as directory, Server(directory) as server:
+        page = browser.new_page(viewport={'width': 1440, 'height': 700})
+        base = dict(doc_id='original', filename='original.pdf', start_page=1, end_page=1,
+                    title='Synthetic record', date_of_service='2025-12-29', date_confidence='exact',
+                    record_type='office_visit', summary='Synthetic text.', pages=[])
+        copy = {**base, 'id': 'copy', 'duplicate': {'is_canonical': False}}
+        canonical = {**base, 'id': 'canonical', 'duplicate': {
+            'is_canonical': True, 'copies': 2, 'others': [{'id': 'copy'}]}}
+        chosen = {**base, 'id': 'chosen', 'doc_id': 'chosen-doc',
+                  'filename': 'chosen.pdf', 'record_type': 'imaging_report'}
+        requests, held = [], []
+
+        def timeline(route):
+            query = parse_qs(urlparse(route.request.url).query)
+            requests.append(query)
+            items = [canonical, chosen]
+            if query.get('include_duplicates') == ['1']:
+                items.append(copy)
+                if not query.get('doc_id') and not held:
+                    held.append((route, items))
+                    page.evaluate('window.__copyRequestHeld = true')
+                    return
+            if query.get('doc_id'):
+                items = [item for item in items if item['doc_id'] == query['doc_id'][0]]
+            if query.get('type'):
+                items = [item for item in items if item['record_type'] == query['type'][0]]
+            route.fulfill(json=items)
+
+        page.route('**/api/documents', lambda route: route.fulfill(json=[
+            {'id': 'original', 'filename': 'original.pdf', 'status': 'done'},
+            {'id': 'chosen-doc', 'filename': 'chosen.pdf', 'status': 'done'},
+        ]))
+        page.route('**/api/timeline?*', timeline)
+        page.goto(server.url)
+        wait_cards(page, 2)
+        page.locator('.card button.copies').click()
+        page.wait_for_function('window.__copyRequestHeld === true')
+        page.locator('#filter-doc').select_option('chosen-doc')
+        page.locator('#filter-type').select_option('imaging_report')
+        page.locator('#filter-type').focus()
+        route, items = held[0]
+        route.fulfill(json=items)
+        wait_cards(page, 1)
+        expect(page.locator('.card')).to_have_attribute('data-id', 'chosen')
+        expect(page.locator('#filter-doc')).to_have_value('chosen-doc')
+        expect(page.locator('#filter-type')).to_have_value('imaging_report')
+        expect(page.locator('#filter-type')).to_be_focused()
+        assert page.evaluate('state.pendingCopies') is None
+        assert len(requests) == 3, 'No automatic widening after an explicit filter choice'
+        assert requests[-1]['doc_id'] == ['chosen-doc']
+        assert requests[-1]['type'] == ['imaging_report']
+        assert server.calls() == {}
+        page.close()
+
+
+def test_remove_pdf_cancel_failure_and_preserve_other_draft(browser):
+    from playwright.sync_api import expect
+
+    with scratch('remove-pdf-browser-') as directory, Server(directory) as server:
+        docs = []
+        for name in ('remove-a.pdf', 'keep-b.pdf'):
+            response = server.client.post('/api/documents', files={
+                'files': (name, synthetic_pdf(1, name), 'application/pdf')})
+            response.raise_for_status()
+            doc_id = response.json()[0]['id']
+            server.wait_status(doc_id, 'done')
+            docs.append(doc_id)
+        records = server.client.get('/api/timeline?include_duplicates=1').json()
+        other_record = next(item for item in records if item['doc_id'] == docs[1])
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+        deletes, dialogs = [], []
+        page.on('request', lambda request: deletes.append(request.url) if request.method == 'DELETE' else None)
+        page.goto(server.url)
+        page.locator('#filter-dups').check()
+        wait_cards(page, 2)
+        open_card(page, other_record['id'])
+        page.locator('[name=title]').fill('Keep this unsaved draft')
+        page.locator('#filter-doc').select_option(docs[0])
+        remove = page.locator(f'#doc-list [data-id="{docs[0]}"]').get_by_role('button', name='Remove', exact=True)
+        expect(remove).to_be_enabled()
+
+        def dismiss(dialog):
+            dialogs.append(dialog.message)
+            dialog.dismiss()
+
+        page.once('dialog', dismiss)
+        remove.click()
+        assert dialogs == ['Remove remove-a.pdf and its stored pages, records, and edits? Your original file is unchanged.']
+        assert deletes == []
+        path = f'**/api/documents/{docs[0]}'
+        page.route(path, lambda route: route.fulfill(status=503, json={'detail': 'Synthetic removal failure'}))
+        page.once('dialog', lambda dialog: dialog.accept())
+        remove.click()
+        expect(page.locator('#upload-status')).to_contain_text('Synthetic removal failure')
+        expect(page.locator('#doc-list .doc')).to_have_count(2)
+        expect(remove).to_be_enabled()
+        expect(page.locator('[name=title]')).to_have_value('Keep this unsaved draft')
+        page.unroute(path)
+        held = []
+        page.route(path, lambda route: held.append(route))
+        page.once('dialog', lambda dialog: dialog.accept())
+        remove.click()
+        expect(page.locator(f'#doc-list [data-id="{docs[0]}"] button.remove-document')).to_be_disabled()
+        assert held
+        held[0].continue_()
+        expect(page.locator('#doc-list .doc')).to_have_count(1)
+        expect(page.locator('#filter-doc')).to_have_value('')
+        expect(page.locator('[name=title]')).to_have_value('Keep this unsaved draft')
+        wait_cards(page, 1)
+        expect(page.locator('.card')).to_have_attribute('data-id', other_record['id'])
+        assert server.client.get(f'/api/records/{other_record["id"]}').status_code == 200
+        assert [doc['id'] for doc in server.client.get('/api/documents').json()] == [docs[1]]
+        assert not (directory / 'store' / 'pages' / docs[0]).exists()
+        page.once('dialog', lambda dialog: dialog.accept())
+        page.locator('#doc-list').get_by_role('button', name='Remove', exact=True).click()
+        expect(page.locator('#doc-list .doc')).to_have_count(0)
+        expect(page.locator('.edit-form')).to_have_count(0)
+        wait_cards(page, 0)
+        page.close()
+
+
+def test_remove_pdf_disabled_until_done_or_failed(browser):
+    from playwright.sync_api import expect
+
+    with scratch('remove-disabled-browser-') as directory, Server(directory) as server:
+        page = browser.new_page()
+        statuses = ['queued', 'rendering', 'extracting', 'grouping', 'summarizing',
+                    'deduping', 'interrupted', 'done', 'failed']
+        page.route('**/api/documents', lambda route: route.fulfill(json=[
+            {'id': status, 'filename': status + '.pdf', 'status': status} for status in statuses]))
+        page.route('**/api/timeline?*', lambda route: route.fulfill(json=[]))
+        page.goto(server.url)
+        for status in statuses:
+            button = page.locator(f'#doc-list [data-id="{status}"]').get_by_role('button', name='Remove', exact=True)
+            if status in ('done', 'failed'):
+                expect(button).to_be_enabled()
+            else:
+                expect(button).to_be_disabled()
+                expect(button).to_have_attribute('title', 'Wait for this PDF to finish processing before removing it.')
         assert server.calls() == {}
         page.close()

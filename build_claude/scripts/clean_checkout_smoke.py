@@ -164,6 +164,26 @@ def exercise():
         require(rows(page_sql, retry_id) == after, "completed retry changed pages")
         require(rows(record_sql, retry_id) == summaries, "completed retry changed summaries")
         checks.append("same-process retry: 4 saved -> 12 done; completed pages/summaries unchanged")
+
+        removed_id, kept_id = docs[0]["id"], docs[1]["id"]
+        kept_pages = rows(page_sql, kept_id)
+        kept_records = rows(record_sql, kept_id)
+        request("DELETE", f"/api/documents/{removed_id}")
+        require({d["id"] for d in request("GET", "/api/documents").json()} == {kept_id, retry_id},
+                "removal affected another document")
+        require(not (data / "uploads" / f"{removed_id}.pdf").exists()
+                and not (data / "pages" / removed_id).exists(), "removed PDF files remain")
+        require(not rows(page_sql, removed_id) and not rows(record_sql, removed_id),
+                "removed PDF still has pages or records")
+        require(rows(page_sql, kept_id) == kept_pages and rows(record_sql, kept_id) == kept_records,
+                "removal changed another PDF's pages or summaries")
+        stop()
+        start()
+        require({d["id"] for d in request("GET", "/api/documents").json()} == {kept_id, retry_id},
+                "removed PDF returned after restart")
+        require(client.delete(f"/api/documents/{removed_id}").status_code == 404,
+                "missing PDF removal must return 404")
+        checks.append("PDF removal persists across restart; other PDFs and stored results unchanged")
         print(json.dumps({"result": "PASS", "checks": checks}), flush=True)
     finally:
         stop()

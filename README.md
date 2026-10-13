@@ -15,7 +15,7 @@ cp env.example .env
 .venv/bin/python -m app
 ```
 
-Open http://127.0.0.1:8000 and drop PDFs. The screen provides a combined timeline, source-page viewer, persistent editor, progress and retry controls, and clickable duplicate badges. Data is stored locally; page images and record text are sent to OpenAI `gpt-6-luna` for processing.
+Open http://127.0.0.1:8000 and drop PDFs. The screen provides a combined timeline, source-page viewer, persistent editor, progress and retry controls, clickable duplicate badges, and confirmed PDF removal. Data is stored locally; page images and record text are sent to OpenAI `gpt-6-luna` for processing.
 
 ## Release evidence
 

@@ -39,6 +39,8 @@ const state = {
   timelineInFlight: false,
   timelineDirty: false,
   pendingCopies: null,
+  removingDocuments: new Set(),
+  documentsVersion: 0,
 };
 
 // ---------- tiny DOM helpers ----------
@@ -155,8 +157,10 @@ async function api(method, url, body, isForm) {
 async function pollDocuments() {
   if (state.pollInFlight) return;
   state.pollInFlight = true;
+  const version = state.documentsVersion;
   try {
     const raw = await api('GET', '/api/documents');
+    if (version !== state.documentsVersion) return; // Removal superseded this snapshot.
     const docs = Array.isArray(raw) ? raw : (raw && raw.documents) || [];
     if (state.serverDown) { state.serverDown = false; setUploadStatus(''); }
     const sig = docSignature(docs);
@@ -187,6 +191,8 @@ function renderDocuments() {
     const done = Number(d.stage_done) || 0;
     const pct = d.status === 'done' ? 100 : total ? Math.min(100, Math.round(100 * done / total)) : 0;
     const canRetry = d.status === 'failed' || d.status === 'interrupted';
+    const removing = state.removingDocuments.has(d.id);
+    const canRemove = d.status === 'done' || d.status === 'failed';
     root.append(h('li', { class: 'doc status-' + (d.status || 'unknown'), dataset: { id: d.id } },
       h('div', { class: 'doc-row' },
         h('span', { class: 'doc-name', title: d.filename }, d.filename || d.id),
@@ -201,7 +207,12 @@ function renderDocuments() {
           deduping: 'Checking duplicates', done: 'Done', failed: 'Failed', interrupted: 'Interrupted',
         })[d.status] || 'Unknown'),
         canRetry && total ? h('span', { class: 'muted' }, `${done}/${total}`) : null,
-        canRetry ? h('button', { type: 'button', class: 'btn small', onclick: () => retryDocument(d.id) }, 'Retry') : null,
+        canRetry ? h('button', { type: 'button', class: 'btn small', disabled: removing, onclick: () => retryDocument(d.id) }, 'Retry') : null,
+        h('button', { type: 'button', class: 'btn small remove-document', disabled: !canRemove || removing,
+          title: removing ? 'Removing this PDF and its stored data.' : canRemove ? 'Remove this PDF and its stored pages, records, and edits.'
+            : 'Wait for this PDF to finish processing before removing it.',
+          onclick: () => removeDocument(d.id),
+        }, removing ? 'Removing…' : 'Remove'),
       ),
       d.error ? h('div', { class: 'error', title: d.error }, d.error) : null,
     ));
@@ -209,6 +220,7 @@ function renderDocuments() {
 }
 
 async function retryDocument(docId) {
+  if (state.removingDocuments.has(docId)) return;
   try {
     await api('POST', `/api/documents/${encodeURIComponent(docId)}/retry`);
     setUploadStatus('Retry queued.');
@@ -216,6 +228,38 @@ async function retryDocument(docId) {
     await pollDocuments();
   } catch (err) {
     setUploadStatus('Retry failed: ' + err.message, true);
+  }
+}
+
+async function removeDocument(docId) {
+  const doc = state.documents.find((item) => item.id === docId);
+  if (!doc || !['done', 'failed'].includes(doc.status) || state.removingDocuments.has(docId)) return;
+  if (!window.confirm(`Remove ${doc.filename || doc.id} and its stored pages, records, and edits? Your original file is unchanged.`)) return;
+  state.removingDocuments.add(docId);
+  renderDocuments();
+  try {
+    await api('DELETE', `/api/documents/${encodeURIComponent(docId)}`);
+    const selected = state.record && state.record.id === state.selectedId ? state.record
+      : state.items.find((item) => item.id === state.selectedId);
+    if (selected && selected.doc_id === docId) closeDetail();
+    state.documentsVersion += 1;
+    state.documents = state.documents.filter((item) => item.id !== docId);
+    state.items = state.items.filter((item) => item.doc_id !== docId);
+    state.pendingCopies = null;
+    if (state.filters.docId === docId) state.filters.docId = '';
+    state.docSignature = null;
+    state.timelineSignature = null;
+    renderDocuments();
+    renderSourceOptions();
+    renderTimeline();
+    setUploadStatus(`Removed ${doc.filename || doc.id}.`);
+    await loadTimeline();
+    await pollDocuments();
+  } catch (err) {
+    setUploadStatus('Could not remove PDF: ' + err.message, true);
+  } finally {
+    state.removingDocuments.delete(docId);
+    renderDocuments();
   }
 }
 
@@ -655,11 +699,13 @@ function init() {
   window.addEventListener('dragover', (e) => e.preventDefault());
   window.addEventListener('drop', (e) => e.preventDefault());
 
-  $('#filter-type').addEventListener('change', (e) => { state.filters.type = e.target.value; loadTimeline(); });
-  $('#filter-doc').addEventListener('change', (e) => { state.filters.docId = e.target.value; loadTimeline(); });
-  $('#filter-dups').addEventListener('change', (e) => { state.filters.includeDuplicates = e.target.checked; loadTimeline(); });
-  $('#filter-hidden').addEventListener('change', (e) => { state.filters.showHidden = e.target.checked; loadTimeline(); });
+  // A newer explicit filter choice supersedes pending duplicate navigation.
+  $('#filter-type').addEventListener('change', (e) => { state.pendingCopies = null; state.filters.type = e.target.value; loadTimeline(); });
+  $('#filter-doc').addEventListener('change', (e) => { state.pendingCopies = null; state.filters.docId = e.target.value; loadTimeline(); });
+  $('#filter-dups').addEventListener('change', (e) => { state.pendingCopies = null; state.filters.includeDuplicates = e.target.checked; loadTimeline(); });
+  $('#filter-hidden').addEventListener('change', (e) => { state.pendingCopies = null; state.filters.showHidden = e.target.checked; loadTimeline(); });
   $('#sort-btn').addEventListener('click', () => {
+    state.pendingCopies = null;
     state.filters.sort = state.filters.sort === 'asc' ? 'desc' : 'asc';
     updateSortButton();
     loadTimeline();

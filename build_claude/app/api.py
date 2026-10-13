@@ -20,6 +20,8 @@ log = logging.getLogger("mrt.api")
 STATIC_DIR = config.ROOT / "static"
 OVERRIDE_FIELDS = ("title", "date_of_service", "record_type", "provider", "summary")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# Keep registration/retry and removal atomic across awaited filesystem work.
+_document_mutations = asyncio.Lock()
 
 _PLACEHOLDER = """<!doctype html><meta charset="utf-8"><title>Medical Record Timeline</title>
 <body style="font-family:system-ui;margin:2rem"><h1>Medical Record Timeline</h1>
@@ -86,15 +88,16 @@ async def upload_documents(files: list[UploadFile] = File(...)):
         except ValueError as e:
             raise HTTPException(400, f"{name}: {e}") from e
         staged.append((doc_id, page_count, data, name))
-    out = []
-    for doc_id, page_count, data, name in staged:
-        doc, is_new = await asyncio.to_thread(worker.store_pdf, doc_id, page_count, data, name)
-        if is_new:
-            worker.enqueue(doc_id)
-        elif doc["status"] in worker.RETRYABLE_STATUSES or worker.needs_resume(doc):
-            worker.retry(doc_id)  # failed/interrupted, or done under a lower MRT_MAX_PAGES
-        log.info("upload %s (%s) new=%s", doc_id[:12], name, is_new)
-        out.append({**db.get_document(doc_id), "existing": not is_new})
+    async with _document_mutations:
+        out = []
+        for doc_id, page_count, data, name in staged:
+            doc, is_new = await asyncio.to_thread(worker.store_pdf, doc_id, page_count, data, name)
+            if is_new:
+                worker.enqueue(doc_id)
+            elif doc["status"] in worker.RETRYABLE_STATUSES or worker.needs_resume(doc):
+                worker.retry(doc_id)  # failed/interrupted, or done under a lower MRT_MAX_PAGES
+            log.info("upload %s (%s) new=%s", doc_id[:12], name, is_new)
+            out.append({**db.get_document(doc_id), "existing": not is_new})
     return out
 
 
@@ -105,31 +108,38 @@ async def list_documents():
 
 @app.post("/api/documents/{doc_id}/retry")
 async def retry_document(doc_id: str):
-    doc = _doc_or_404(doc_id)
-    if _busy(doc):
-        raise HTTPException(409, f"document is {doc['status']}, wait for it to finish")
-    worker.retry(doc_id)
-    return db.get_document(doc_id)
+    async with _document_mutations:
+        doc = _doc_or_404(doc_id)
+        if _busy(doc):
+            raise HTTPException(409, f"document is {doc['status']}, wait for it to finish")
+        worker.retry(doc_id)
+        return db.get_document(doc_id)
 
 
 def _remove_files(doc_id: str) -> None:
-    shutil.rmtree(config.PAGES_DIR / doc_id, ignore_errors=True)
+    pages = config.PAGES_DIR / doc_id
+    if pages.is_symlink():
+        pages.unlink()  # Warm fixtures can link to a shared source cache.
+    elif pages.exists():
+        shutil.rmtree(pages)
     worker.pdf_path(doc_id).unlink(missing_ok=True)
 
 
 @app.delete("/api/documents/{doc_id}")
 async def delete_document(doc_id: str):
-    doc = _doc_or_404(doc_id)
-    if _busy(doc):
-        raise HTTPException(409, f"document is {doc['status']}, wait for it to finish")
-    db.delete_document(doc_id)
-    await asyncio.to_thread(_remove_files, doc_id)
-    try:  # duplicate groups may have lost members
-        from .pipeline.dedupe import dedupe_all
-        await worker.call_stage(dedupe_all)
-    except Exception:
-        log.exception("dedupe after delete failed")
-    return {"ok": True, "id": doc_id}
+    async with _document_mutations:
+        doc = _doc_or_404(doc_id)
+        if doc["status"] not in ("done", "failed") or _busy(doc):
+            raise HTTPException(409, f"document is {doc['status']}, wait for it to finish")
+        # Keep metadata available for a removal retry if filesystem cleanup fails.
+        await asyncio.to_thread(_remove_files, doc_id)
+        db.delete_document(doc_id)
+        try:  # duplicate groups may have lost members
+            from .pipeline.dedupe import dedupe_all
+            await worker.call_stage(dedupe_all)
+        except Exception:
+            log.exception("dedupe after delete failed")
+        return {"ok": True, "id": doc_id}
 
 
 # ---------- timeline items ----------

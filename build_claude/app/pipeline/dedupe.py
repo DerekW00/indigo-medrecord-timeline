@@ -1,18 +1,8 @@
-"""Stage 5: exact and near-duplicate detection across all documents (spec section 8).
+"""Exact image containment and conservative, model-confirmed duplicate detection.
 
-Rules in short:
-- normalize: lowercase, drop fax header lines and the TPA stamp, keep [a-z0-9 ], collapse spaces
-- exact: same sha256 of the normalized text, across any documents
-- near: same record_type, same effective date (or one null), Jaccard of word 3-gram shingles >= 0.7
-- union-find the pairs; canonical = most pages, then earliest document, then lowest start page
-
-`find_duplicates` is pure (unit tested); `dedupe_all` is the thin DB wrapper that rebuilds the
-whole duplicate_groups table. It must run whenever its inputs change, or the table goes stale and
-a copy whose canonical is gone (or hidden) is filtered off the timeline as a "duplicate":
-- after `group_document` (a re-group can delete a canonical record; its copies keep pointing at it)
-- after summarize, on the success and the failure path (records that did finish are `done`)
-- after an override write or reset that changes date_of_service, record_type or hidden
-  (`pairing_changed` tells the API whether a write needs it)
+Every member is compared directly with the longest canonical record. Image evidence
+wins over OCR discrepancies; similarity only proposes a pair, never hides a record.
+The API's awaitable wrapper and the existing duplicate-table shape are preserved.
 """
 from __future__ import annotations
 
@@ -21,16 +11,19 @@ import hashlib
 import logging
 import re
 import threading
-from collections import Counter, defaultdict
-from dataclasses import dataclass
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
-from .. import db
+from pydantic import BaseModel, ConfigDict, Field
+
+from .. import config, db, llm
+from .prompts_util import load_prompt
 
 log = logging.getLogger(__name__)
 
-NEAR_THRESHOLD = 0.7   # Jaccard at or above this is a near duplicate
+NEAR_THRESHOLD = 0.8   # Candidate only: confirmation is mandatory
 SHINGLE_SIZE = 3       # words per shingle
 MIN_WORDS = 8          # shorter normalized texts (blank or failed pages) never take part
 PAIRING_FIELDS = ("date_of_service", "record_type", "hidden")   # override fields that drive the pairing
@@ -115,151 +108,125 @@ def _norm_date(value) -> str | None:
             return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
         except ValueError:
             pass
-    return s
+    return None
 
 
-# ---------- pairing ----------
+# ---------- conservative pairing ----------
 
-@dataclass
-class _Item:
-    id: str
-    doc_created_at: str
-    start_page: int
-    end_page: int
-    date: str | None
-    record_type: str | None
-    hash: str
-    shingles: set
-    words: int
-
-    @property
-    def pages(self) -> int:
-        return self.end_page - self.start_page + 1
+_CLINICAL_TOKEN_RE = re.compile(
+    r"[+\-−]?(?:\d+(?:\.\d+)?|\.\d+)(?:/\d+(?:\.\d+)?)?|[a-z]+(?:['’][a-z]+)?|[+\-−%°<>≤≥=]"
+)
 
 
-def _prepare(r: dict) -> _Item:
-    norm = normalize_text(r.get("text") or "")
-    return _Item(
-        id=r["id"], doc_created_at=str(r.get("doc_created_at") or ""),
-        start_page=int(r.get("start_page") or 0), end_page=int(r.get("end_page") or 0),
-        date=_norm_date(r.get("date_of_service")), record_type=r.get("record_type"),
-        hash=hashlib.sha256(norm.encode("utf-8")).hexdigest(),
-        shingles=shingles(norm), words=len(norm.split()),
-    )
-
-
-def _canonical_key(it: _Item):
-    return (-it.pages, it.doc_created_at, it.start_page, it.id)
-
-
-class _UnionFind:
-    def __init__(self, ids):
-        self.parent = {i: i for i in ids}
-
-    def find(self, x):
-        while self.parent[x] != x:
-            self.parent[x] = self.parent[self.parent[x]]
-            x = self.parent[x]
-        return x
-
-    def union(self, a, b):
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.parent[rb] = ra
-
-
-def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD, *, exact_only: bool = False) -> list[dict]:
-    """Pure: records have id, doc_id, doc_created_at, start_page, end_page, date_of_service,
-    record_type, text. Returns duplicate_groups rows {record_id, group_id, is_canonical, reason,
-    score} for every member of a group of size >= 2; group_id is the canonical record id."""
-    image_rows = find_image_duplicates(records)
-    image_ids = {r["record_id"] for r in image_rows}
-    seen: set[str] = set()
-    items: list[_Item] = []
-    for r in records:
-        if r["id"] in seen or r["id"] in image_ids:
+def clinical_text(text: str) -> str:
+    """Remove identified transmission metadata, keeping clinical punctuation and negation."""
+    lines = []
+    for line in (text or "").lower().splitlines():
+        line = _STAMP_RE.sub(" ", line).strip()
+        timestamp = _DATE_RE.search(line) and _TIME_RE.search(line)
+        identified = (timestamp and ("fax" in line or "page" in line or _has_page_fraction(line)))
+        numbered_header = re.fullmatch(r"(?:page|pg)\s*\d+\s*/\s*\d+", line)
+        if identified or numbered_header:
             continue
-        seen.add(r["id"])
-        it = _prepare(r)
-        if it.words >= MIN_WORDS:
-            items.append(it)
-    uf = _UnionFind(it.id for it in items)
-
-    by_hash: dict[str, list[_Item]] = defaultdict(list)
-    for it in items:
-        by_hash[it.hash].append(it)
-    for same in by_hash.values():
-        for other in same[1:]:
-            uf.union(same[0].id, other.id)
-
-    by_type: dict[str | None, list[_Item]] = defaultdict(list)
-    for it in items:
-        by_type[it.record_type].append(it)
-    for bucket in ([] if exact_only else by_type.values()):
-        for i, a in enumerate(bucket):
-            for b in bucket[i + 1:]:
-                if a.hash == b.hash or (a.date and b.date and a.date != b.date):
-                    continue
-                sizes = (len(a.shingles), len(b.shingles))
-                if min(sizes) / max(sizes) < threshold:   # Jaccard can never reach the threshold
-                    continue
-                if jaccard(a.shingles, b.shingles) >= threshold:
-                    uf.union(a.id, b.id)
-
-    groups: dict[str, list[_Item]] = defaultdict(list)
-    for it in items:
-        groups[uf.find(it.id)].append(it)
-    rows: list[dict] = list(image_rows)
-    for members in groups.values():
-        if len(members) < 2:
-            continue
-        canonical = min(members, key=_canonical_key)
-        all_exact = True
-        for m in members:
-            if m is canonical:
-                continue
-            exact = m.hash == canonical.hash
-            all_exact = all_exact and exact
-            rows.append({"record_id": m.id, "group_id": canonical.id, "is_canonical": 0,
-                         "reason": "exact" if exact else "similar",
-                         "score": 1.0 if exact else round(jaccard(m.shingles, canonical.shingles), 4)})
-        rows.append({"record_id": canonical.id, "group_id": canonical.id, "is_canonical": 1,
-                     "reason": "exact" if all_exact else "similar", "score": 1.0})
-    rows.sort(key=lambda r: (r["group_id"], -r["is_canonical"], r["record_id"]))
-    return rows
+        lines.append(line)
+    return " ".join(" ".join(lines).split())
 
 
-def find_image_duplicates(records: list[dict]) -> list[dict]:
-    """Only complete, nonempty multisets may prove containment; never chain subsets."""
-    items = sorted({r["id"]: r for r in records}.values(),
-                   key=lambda r: _canonical_key(_prepare(r)))
-    assigned = set()
-    rows = []
-    for a in items:
+def clinical_tokens(text: str) -> set[str]:
+    return set(_CLINICAL_TOKEN_RE.findall(clinical_text(text)))
+
+
+def candidate_score(a: dict, b: dict) -> float:
+    date_a, date_b = _norm_date(a.get("date_of_service")), _norm_date(b.get("date_of_service"))
+    if not date_a or not date_b or date_a != date_b:
+        return 0.0
+    if not a.get("record_type") or a["record_type"] != b.get("record_type"):
+        return 0.0
+    return jaccard(clinical_tokens(a.get("text", "")), clinical_tokens(b.get("text", "")))
+
+
+def _canonical_key(r: dict):
+    return (-(r["end_page"] - r["start_page"] + 1), str(r.get("doc_created_at") or ""),
+            r["start_page"], r["id"])
+
+
+def _images(r: dict) -> Counter | None:
+    hashes = r.get("image_hashes")
+    if not hashes or len(hashes) != r["end_page"] - r["start_page"] + 1 or not all(hashes):
+        return None
+    return Counter(hashes)
+
+
+def exact_relation(a: dict, b: dict) -> str | None:
+    ah, bh = _images(a), _images(b)
+    if ah and bh and bh <= ah:
+        return "exact_image" if ah == bh else "partial_exact"
+    # Preserve signs/decimals: the old punctuation-stripping hash cannot prove clinical equality.
+    at, bt = clinical_text(a.get("text", "")), clinical_text(b.get("text", ""))
+    if len(at.split()) >= MIN_WORDS and at == bt:
+        return "exact"
+    return None
+
+
+class DuplicateConfirmation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    relation: Literal["duplicate", "complementary", "distinct", "uncertain"]
+    confidence: Literal["high", "medium", "low"]
+    reason: str = Field(min_length=1)
+    a_pages: list[int]
+    b_pages: list[int]
+    unique_content: str
+
+
+def confirmed_duplicate(decision: DuplicateConfirmation, a: dict, b: dict) -> bool:
+    """Require affirmative evidence for every page and no unique clinical content."""
+    return (decision.relation == "duplicate" and decision.confidence == "high"
+            and not decision.unique_content.strip()
+            and set(decision.a_pages) == set(range(a["start_page"], a["end_page"] + 1))
+            and set(decision.b_pages) == set(range(b["start_page"], b["end_page"] + 1)))
+
+
+def _rows_for_group(a: dict, members: list[dict]) -> list[dict]:
+    if not members:
+        return []
+    reasons = {m["reason"] for m in members}
+    reason = next(r for r in ("similar_confirmed", "partial_exact", "exact_image", "exact") if r in reasons)
+    return [{"record_id": a["id"], "group_id": a["id"], "is_canonical": 1,
+             "reason": reason, "score": 1.0}, *members]
+
+
+def _member(a: dict, b: dict, reason: str, score: float = 1.0) -> dict:
+    return {"record_id": b["id"], "group_id": a["id"], "is_canonical": 0,
+            "reason": reason, "score": round(score, 6)}
+
+
+def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD, *,
+                    exact_only: bool = False, confirmations: dict | None = None) -> list[dict]:
+    """Pure grouping; optional injected decisions obey the same production confirmation gates."""
+    items = sorted({r["id"]: r for r in records}.values(), key=_canonical_key)
+    assigned, rows = set(), []
+    for i, a in enumerate(items):
         if a["id"] in assigned:
             continue
-        ah = a.get("image_hashes")
-        if not ah or len(ah) != a["end_page"] - a["start_page"] + 1 or not all(ah):
-            continue
         members = []
-        for b in items:
+        for b in items[i + 1:]:
             if b["id"] == a["id"] or b["id"] in assigned:
                 continue
-            bh = b.get("image_hashes")
-            if not bh or len(bh) != b["end_page"] - b["start_page"] + 1 or not all(bh):
-                continue
-            if Counter(bh) <= Counter(ah):
-                reason = "exact_image" if Counter(bh) == Counter(ah) else "partial_exact"
-                members.append({"record_id": b["id"], "group_id": a["id"],
-                                "is_canonical": 0, "reason": reason, "score": 1.0})
+            reason, score = exact_relation(a, b), 1.0
+            if not reason and not exact_only:
+                score = candidate_score(a, b)
+                decision = (confirmations or {}).get((a["id"], b["id"]))
+                if score >= max(threshold, NEAR_THRESHOLD) and decision is not None:
+                    decision = DuplicateConfirmation.model_validate(decision)
+                    if confirmed_duplicate(decision, a, b):
+                        reason = "similar_confirmed"
+            if reason:
+                members.append(_member(a, b, reason, score))
                 assigned.add(b["id"])
         if members:
             assigned.add(a["id"])
-            rows.extend(members)
-            rows.append({"record_id": a["id"], "group_id": a["id"], "is_canonical": 1,
-                         "reason": "partial_exact" if any(m["reason"] == "partial_exact" for m in members)
-                         else "exact_image", "score": 1.0})
-    return rows
+            rows.extend(_rows_for_group(a, members))
+    return sorted(rows, key=lambda r: (r["group_id"], -r["is_canonical"], r["record_id"]))
 
 
 def image_hash(path: str | None) -> str | None:
@@ -280,40 +247,104 @@ def pairing_changed(before: dict | None, after: dict | None) -> bool:
     return any((b.get(k) or None) != (a.get(k) or None) for k in PAIRING_FIELDS)
 
 
-def dedupe_all(*, exact_only: bool = False) -> None:
-    """Recompute duplicate groups over every done record of every document and store them.
-    Effective date and type (user overrides applied) drive the pairing; hidden records are skipped.
-    Records that are pending or failed (for example just re-grouped) take no part, so any row that
-    pointed at a deleted or not-yet-summarized canonical is dropped by the rebuild.
-    Serialized: concurrent callers run one after another, each over the state current at its start."""
-    with _recompute_lock:
-        overrides = db.get_overrides()
-        page_text: dict[str, dict[int, str]] = {}
-        page_hashes = {}
-        items: list[dict] = []
-        for r in db.all_done_records():
-            ov = overrides.get(r["id"]) or {}
-            if ov.get("hidden"):
+def _load_items() -> list[dict]:
+    overrides = db.get_overrides()
+    page_data = {}
+    items = []
+    for r in db.all_done_records():
+        ov = overrides.get(r["id"]) or {}
+        if ov.get("hidden"):
+            continue
+        if r["doc_id"] not in page_data:
+            pages = db.get_pages(r["doc_id"])
+            page_data[r["doc_id"]] = {p["page_no"]: {**p, "image_hash": image_hash(p["image_path"])}
+                                      for p in pages}
+        pages = page_data[r["doc_id"]]
+        numbers = range(r["start_page"], r["end_page"] + 1)
+        items.append({**r,
+            "date_of_service": ov.get("date_of_service") or r.get("date_of_service"),
+            "record_type": ov.get("record_type") or r.get("record_type"),
+            "image_hashes": [pages.get(n, {}).get("image_hash") for n in numbers],
+            "text": "\n".join(pages.get(n, {}).get("text") or "" for n in numbers),
+            "transcription": "\n".join(f"=== Page {n} ===\n{pages.get(n, {}).get('text') or ''}"
+                                          for n in numbers),
+            "text_complete": all(pages.get(n, {}).get("status") == "done"
+                                 and (pages.get(n, {}).get("text") or "").strip() for n in numbers),
+        })
+    return sorted(items, key=_canonical_key)
+
+
+async def confirm_pair(a: dict, b: dict) -> DuplicateConfirmation:
+    if config.FAKE_LLM:
+        return DuplicateConfirmation(relation="uncertain", confidence="low", reason="fake mode",
+                                     a_pages=[], b_pages=[], unique_content="not assessed")
+    if config.OPENAI_MODEL != "gpt-6-luna":
+        raise ValueError("duplicate confirmation requires gpt-6-luna")
+    system, template = load_prompt("duplicate_confirm")
+    user = template.format(a_start=a["start_page"], a_end=a["end_page"],
+                           b_start=b["start_page"], b_end=b["end_page"],
+                           a_text=a["transcription"], b_text=b["transcription"])
+    return await llm.text_json(system, user, DuplicateConfirmation,
+                               f"dedupe {a['id']} {b['id']}")
+
+
+async def dedupe_all(*, exact_only: bool = False, max_confirmations: int = 8,
+                     evidence: list[dict] | None = None) -> None:
+    """Serialize recomputation; disk/hash/SQLite work runs off the event loop.
+
+    A failed, incomplete, over-budget or uncertain confirmation keeps both records.
+    Publish atomically only after the complete pass; cancellation leaves the prior table.
+    """
+    while not _recompute_lock.acquire(blocking=False):
+        await asyncio.sleep(0.01)
+    try:
+        items = await asyncio.to_thread(_load_items)
+        assigned, rows, calls = set(), [], 0
+        for i, a in enumerate(items):
+            if a["id"] in assigned:
                 continue
-            if r["doc_id"] not in page_text:
-                source_pages = db.get_pages(r["doc_id"])
-                page_text[r["doc_id"]] = {p["page_no"]: p["text"] or "" for p in source_pages}
-                page_hashes[r["doc_id"]] = {p["page_no"]: image_hash(p["image_path"]) for p in source_pages}
-            pages = page_text[r["doc_id"]]
-            items.append({
-                "id": r["id"], "doc_id": r["doc_id"], "doc_created_at": r.get("doc_created_at"),
-                "start_page": r["start_page"], "end_page": r["end_page"],
-                "date_of_service": ov.get("date_of_service") or r.get("date_of_service"),
-                "record_type": ov.get("record_type") or r.get("record_type"),
-                "image_hashes": [page_hashes[r["doc_id"]].get(n) for n in range(r["start_page"], r["end_page"] + 1)],
-                "text": "\n".join(pages.get(n, "") for n in range(r["start_page"], r["end_page"] + 1)),
-            })
-        rows = find_duplicates(items, exact_only=exact_only)
-        db.replace_duplicate_groups(rows)
-    log.info("dedupe: %d records, %d duplicate groups, %d grouped records",
-             len(items), len({row["group_id"] for row in rows}), len(rows))
+            members = []
+            for b in items[i + 1:]:
+                if b["id"] == a["id"] or b["id"] in assigned:
+                    continue
+                reason, score = exact_relation(a, b), 1.0
+                if not reason and not exact_only:
+                    score = candidate_score(a, b)
+                    if score >= NEAR_THRESHOLD:
+                        entry = {"a": a["id"], "b": b["id"], "score": score,
+                                 "model": config.OPENAI_MODEL, "fake": config.FAKE_LLM}
+                        complete = a["text_complete"] and b["text_complete"]
+                        # Do not truncate evidence to manufacture certainty.
+                        fits = len(a["transcription"]) + len(b["transcription"]) <= 80000
+                        if not complete or not fits or calls >= max_confirmations:
+                            entry["skipped"] = "incomplete text" if not complete else (
+                                "input too long" if not fits else "confirmation budget")
+                        else:
+                            calls += 1
+                            try:
+                                decision = await confirm_pair(a, b)
+                                entry["decision"] = decision.model_dump()
+                                if confirmed_duplicate(decision, a, b):
+                                    reason = "similar_confirmed"
+                            except Exception as exc:
+                                # Never log source text carried by adapter validation errors.
+                                entry["error"] = type(exc).__name__
+                        entry["accepted"] = reason == "similar_confirmed"
+                        if evidence is not None:
+                            evidence.append(entry)
+                if reason:
+                    members.append(_member(a, b, reason, score))
+                    assigned.add(b["id"])
+            if members:
+                assigned.add(a["id"])
+                rows.extend(_rows_for_group(a, members))
+        await asyncio.to_thread(db.replace_duplicate_groups, rows)
+        log.info("dedupe: %d records, %d groups, %d confirmations", len(items),
+                 len({r["group_id"] for r in rows}), calls)
+    finally:
+        _recompute_lock.release()
 
 
 async def dedupe_all_async() -> None:
-    """Same as dedupe_all, off the event loop (hashing and shingling are CPU work)."""
-    await asyncio.to_thread(dedupe_all)
+    """Compatibility entry point for the existing API."""
+    await dedupe_all()

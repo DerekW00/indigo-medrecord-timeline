@@ -64,10 +64,18 @@ def main() -> None:
     doc = run_eval.find_document(args.doc_id, None)
     before = {t: db.connect().execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
               for t in ("documents", "pages", "records", "record_overrides")}
-    if args.mode == "exact":
-        dedupe.dedupe_all(exact_only=True)
-    else:
-        raise ValueError("confirmed mode not yet implemented")
+    evidence = []
+    asyncio.run(dedupe.dedupe_all(exact_only=args.mode == "exact", max_confirmations=8, evidence=evidence))
+    from app import config
+    from app.pipeline.prompts_util import load_prompt
+    import hashlib
+    prompt = "\n".join(load_prompt("duplicate_confirm"))
+    (destination / "confirmations.json").write_text(json.dumps({
+        "model": config.OPENAI_MODEL, "fake": config.FAKE_LLM,
+        "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+        "candidates": evidence, "calls": sum("decision" in e or "error" in e for e in evidence),
+        "accepted": sum(e["accepted"] for e in evidence),
+    }, indent=2) + "\n")
     run_eval.main(["--doc-id", doc["id"], "--gold", str(args.gold),
                    "--out", str(destination / "eval.json")])
     report = json.loads((destination / "eval.json").read_text())

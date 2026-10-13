@@ -83,3 +83,21 @@ The local orchestration calls the existing safe-copy helper, validates/replays t
 F4 is now a **user-accepted known limitation**, not a claimed 31/31 result. The requested r24 service-date edit to `2024-10-02`, refresh, server restart, persisted override and Reset passed in a disposable copy (**1 browser test passed in 5.50s**, no extraction/summary calls). Gold and model date remain unchanged.
 
 A first U repeat on the two-group dataset exposed an outdated test assumption: it expected card count to stay fixed after date/type edits even though those edits now recompute membership. In fake mode no fresh near confirmation exists, so extra sources correctly become visible. The test now compares post-edit cards to the current API while still verifying both original real groups and all source links before editing. This was a test expectation failure (1 failed in 38.17s); the final full rerun is recorded below.
+
+## Integrated verification after fallback
+
+Full suite command on application candidate `3eef7edcd22a94b37c04845fb42b883b02ceae32`:
+
+```bash
+MRT_DATA_DIR="$PWD/data/task5" MRT_TEST_SCRATCH_ROOT="$PWD/data/task5" MRT_UI_DATA_SOURCE="$PWD/data/task5/release-fallback188" MRT_UI_EXPECT_DUPLICATE_GROUPS=2 MRT_TEST_BROWSER=/usr/bin/google-chrome MRT_FAKE_LLM=1 .venv/bin/python -m pytest -q --basetemp="$PWD/data/task5/pytest-final-fallback"
+```
+
+**155 passed in 32.28s**. This includes both real duplicate groups, all 188 source image URLs, polling while typing, filters, keyboard navigation, edits through restart/reset, the explicit r24 correction, and synthetic same-process retry and interrupted-work recovery. Model-call spies verify completed page/summary calls do not repeat.
+
+C on `3eef7ed` initially failed because it compared `records.updated_at` after regrouping; grouping legitimately refreshes boundary metadata timestamps. Actual summary fields are reused. The smoke assertion now compares summary content, fields and content hash; the separate call-spy tests cover non-repetition. Final committed rerun follows.
+
+## Demo server handoff
+
+At **22:27:32 UTC**, Task5 verified PID 193902 was the expected Task4 app in its original working directory and all documents were idle, then terminated only that process. The replacement integrated server is PID **204946**, loopback **127.0.0.1:8000**, own `data/task5/demo188`, real `gpt-6-luna` mode, application code `3eef7ed`. Health returned 200; one completed 188-page document, 35 records, 33 visible cards, two duplicate groups. The old `ui188` store was preserved. Demo copy uses SQLite backup, 188 verified JPEG copies and verified source PDF hash. No upload or real extraction was performed during handoff.
+
+The Mac tunnel and requested part-PDF upload remain unverified: coordinator reports three offline Mac peers and no part PDF on the VPS. The new upload is user-authorized if the Mac/file become available; full188 and r24 extraction remain prohibited. External adversarial report was still absent at this checkpoint.

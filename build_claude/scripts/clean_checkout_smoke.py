@@ -152,7 +152,11 @@ def exercise():
         require(server.pid == pid and after[:4] == before[:4], "retry repeated completed pages or restarted")
         require(len(after) == 12 and all(r[1] == "done" for r in after), "retry incomplete")
         require(after[4][2] == 2 and all(r[2] == 1 for r in after[5:]), "retry attempt counts incorrect")
-        record_sql = "SELECT id,status,summary,updated_at FROM records WHERE doc_id=? ORDER BY id"
+        # Regrouping refreshes boundary metadata timestamps even when a done
+        # summary is reused. Compare the actual summary fields and content hash.
+        record_sql = ("SELECT id,status,title,date_of_service,date_confidence,record_type,provider,"
+                      "facility,summary,key_findings_json,flags_json,content_hash "
+                      "FROM records WHERE doc_id=? ORDER BY id")
         summaries = rows(record_sql, retry_id)
         require(bool(summaries) and all(r[1] == "done" for r in summaries), "summaries incomplete")
         request("POST", f"/api/documents/{retry_id}/retry")

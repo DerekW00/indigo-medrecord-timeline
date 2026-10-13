@@ -151,14 +151,16 @@ def test_full188_sources_filters_edit_restart_reset(browser):
             eventually(lambda: server.client.get(f"/api/records/{chosen['id']}").json()['title'] == marker)
             page.locator('.detail-head .edited').wait_for()
             page.reload()
-            wait_cards(page, len(visible))
+            # Editing date/type recomputes membership. Fake mode has no new
+            # confirmation, so previously near-grouped copies can become visible.
+            wait_cards(page, len(server.client.get('/api/timeline').json()))
             open_card(page, chosen['id'])
             for name, value in edits.items():
                 assert page.locator(f'.edit-form [name="{name}"]').input_value() == value
             server.stop()
             server.start()
             page.reload()
-            wait_cards(page, len(visible))
+            wait_cards(page, len(server.client.get('/api/timeline').json()))
             open_card(page, chosen['id'])
             for name, value in edits.items():
                 assert page.locator(f'.edit-form [name="{name}"]').input_value() == value
@@ -231,3 +233,43 @@ def test_browser_same_process_retry(browser):
         counts = [n for (kind, _), n in server.calls().items() if kind == 'vision']
         assert len(counts) == 12 and set(counts) == {1}
         page.close()
+
+
+def test_known_date_miss_reviewer_correction_survives_restart(browser):
+    """Explicit demo acceptance: correct r24 in a disposable copy, then restore it."""
+    source = os.environ.get('MRT_UI_DATA_SOURCE')
+    if not source:
+        pytest.skip('Known-date rehearsal requires MRT_UI_DATA_SOURCE')
+    with scratch('date-correction-browser-') as directory:
+        copy_completed_store(Path(source), directory / 'store')
+        with Server(directory) as server:
+            page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+            page.goto(server.url)
+            items = server.client.get('/api/timeline?include_duplicates=1').json()
+            record = next(i for i in items if (i['start_page'], i['end_page']) == (151, 152))
+            original = record['model']['date_of_service']
+            page.locator('#filter-dups').check()
+            wait_cards(page, len(items))
+            open_card(page, record['id'])
+            page.locator('.edit-form [name=date_of_service]').fill('2024-10-02')
+            page.get_by_role('button', name='Save', exact=True).click()
+            path = f"/api/records/{record['id']}"
+            eventually(lambda: server.client.get(path).json()['date_of_service'] == '2024-10-02')
+            assert server.client.get(path).json()['model']['date_of_service'] == original
+            page.reload()
+            open_card(page, record['id'])
+            assert page.locator('.edit-form [name=date_of_service]').input_value() == '2024-10-02'
+            server.stop()
+            server.start()
+            page.reload()
+            open_card(page, record['id'])
+            persisted = server.client.get(path).json()
+            assert persisted['edited'] and persisted['date_of_service'] == '2024-10-02'
+            assert persisted['model']['date_of_service'] == original
+            assert page.locator('.edit-form [name=date_of_service]').input_value() == '2024-10-02'
+            page.once('dialog', lambda dialog: dialog.accept())
+            page.get_by_role('button', name='Reset to model version', exact=True).click()
+            eventually(lambda: not server.client.get(path).json()['edited'])
+            assert server.client.get(path).json()['date_of_service'] == original
+            assert server.calls() == {}, 'Known-date demo must reuse every real extraction/summary'
+            page.close()

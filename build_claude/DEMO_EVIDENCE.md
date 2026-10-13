@@ -53,3 +53,33 @@ MRT_DATA_DIR=/Users/dw/indigo-integration/build_claude/data/task5 MRT_FAKE_LLM=1
 ```
 
 Result after fix, before lane integration: **68 passed in 0.55s**; `git diff --check` passed. The external adversarial report was not yet present.
+
+## Rolling integration and judge
+
+Rolling merges began at **22:20:08 UTC**. Task2 merged as `03b2723` (96 tests passed); Task3 as `7fea981` (127 passed); Task4 as `67bc84e1a018b3aedff978b75f5be63e131c03c8` (133 passed in 26.68s, including full188 browser and recovery). All merged diffs were inspected and `git diff --check` passed.
+
+J ran once on `67bc84e`, with all 35 completed summaries and unchanged evaluator/judge prompt. Actual command from `build_claude` (logging wrapper changes no evaluation behavior):
+
+```bash
+MRT_DATA_DIR="$PWD/data/task5/release188" OPENAI_MODEL=gpt-6-luna MRT_FAKE_LLM=0 MRT_CONCURRENCY=16 .venv/bin/python -c 'import logging, runpy; logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"); runpy.run_path("eval/run_eval.py", run_name="__main__")' --doc-id d820c2727783 --gold /Users/dw/indigo/eval/gold/record_1.json --judge --out "$PWD/data/task5/post-fixes-eval.json" > "$PWD/data/task5/judge-1.log" 2>&1
+```
+
+**J PASS:** 496/499 claims supported (0.994), 2 unsupported, 1 unclear, 0 call errors; 35 logical calls, each attempt 1. Report SHA256 `12f8221f5339c823ed0d0014e017103b1d3eee8243da72572bd11c69dee15476`. Raw claims/log remain ignored. The two unsupported claims are in spans 28–31 and 185–188. The judge sees capped transcription and key findings, not every source image.
+
+## Latest user steering: F2 fallback and accepted F4 limitation
+
+The coordinator delivered explicit Task5 ownership and verified Task3 was stopped at 22:22:35 UTC. Task5 reviewed the interrupted partial patch and completed scoped tests. Valid complete uncertain decisions qualify only for equal known service dates, equal types and clinical token-set Jaccard >= 0.85, stored as `similar`. Existing high-confidence confirmation remains. Distinct/different/complementary veto; invalid, failed, skipped, fake and incomplete responses cannot activate the fallback.
+
+Focused suite: **79 passed in 0.68s**, including inclusive threshold, veto, invalid/error/missing-response, date/type gates, production path, and API edit/reset behavior.
+
+The new rule was applied to the **existing real uncertain decision**, with source records, page text, complete transcriptions, model, prompt hash and score checked against its original Task3 store. No model reroll was performed. Local command:
+
+```bash
+.venv/bin/python data/task5/apply_saved_confirmation.py > data/task5/fallback-eval.log 2>&1
+```
+
+The local orchestration calls the existing safe-copy helper, validates/replays the saved decision through the production deduper, and invokes the unchanged evaluator. Output store: `data/task5/release-fallback188`; provenance: `fallback-provenance.json`; updated report: `eval.json`. **Duplicates 2/2, false pairs 0; both negative pairs remain separate.** One validated real decision reused; zero additional model calls. All source and summary fields are identical to the judged data, so the coordinator explicitly authorized preserving J. Boundary results remain 31/31 matched spans, 188/188 pages; types 31/31; model dates 30/31; date rule 0/35.
+
+F4 is now a **user-accepted known limitation**, not a claimed 31/31 result. The requested r24 service-date edit to `2024-10-02`, refresh, server restart, persisted override and Reset passed in a disposable copy (**1 browser test passed in 5.50s**, no extraction/summary calls). Gold and model date remain unchanged.
+
+A first U repeat on the two-group dataset exposed an outdated test assumption: it expected card count to stay fixed after date/type edits even though those edits now recompute membership. In fake mode no fresh near confirmation exists, so extra sources correctly become visible. The test now compares post-edit cards to the current API while still verifying both original real groups and all source links before editing. This was a test expectation failure (1 failed in 38.17s); the final full rerun is recorded below.

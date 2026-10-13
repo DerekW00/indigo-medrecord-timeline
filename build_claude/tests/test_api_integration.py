@@ -67,3 +67,28 @@ async def test_prose_only_save_and_reset_do_not_repeat_duplicate_confirmation(du
         assert response.status_code == 200 and response.json()["edited"]
         reset = await client.delete(f"/api/records/{rid}/overrides")
         assert reset.status_code == 200 and not reset.json()["edited"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("patch", [{"date_of_service": "2026-02-02"}, {"record_type": "correspondence"}])
+async def test_date_or_type_edit_separates_near_copy_and_reset_rejoins(duplicate_store, monkeypatch, patch):
+    canonical, copy = duplicate_store
+    record = db.get_record(copy)
+    page = db.get_pages(record["doc_id"])[0]
+    changed_text = page["text"].replace("invented", "inventedd")
+    db.save_page_result(record["doc_id"], 1, {}, changed_text, dedupe.content_hash(changed_text), 1)
+
+    async def synthetic_confirmation(a, b):
+        return dedupe.DuplicateConfirmation(relation="duplicate", confidence="high",
+            reason="Injected synthetic confirmation", a_pages=[1], b_pages=[1], unique_content="")
+
+    monkeypatch.setattr(dedupe, "confirm_pair", synthetic_confirmation)
+    await dedupe.dedupe_all_async()
+    assert db.get_duplicate_groups()[copy]["reason"] == "similar_confirmed"
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=api.app), base_url="http://test") as client:
+        changed = await client.patch(f"/api/records/{copy}", json=patch)
+        assert changed.status_code == 200 and changed.json()["duplicate"] is None
+        assert len((await client.get("/api/timeline")).json()) == 2
+        reset = await client.delete(f"/api/records/{copy}/overrides")
+        assert reset.status_code == 200 and reset.json()["duplicate"]["group_id"] == canonical
+        assert [r["id"] for r in (await client.get("/api/timeline")).json()] == [canonical]

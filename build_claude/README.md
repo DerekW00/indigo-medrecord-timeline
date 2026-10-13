@@ -25,7 +25,7 @@ Open http://127.0.0.1:8000 and drop one or more PDFs. Files, page images, edits,
 2. A vision call transcribes each page and identifies boundary/date signals. Each completed page is saved immediately in SQLite.
 3. Deterministic grouping uses printed page continuity, fax transmissions, headings, record types, and service dates. Cover pages attach forward; mid-record starts receive a flag. Boundary explanations are visible in the detail panel.
 4. Text calls summarize grouped transcriptions. Done summaries survive a retry when record boundaries remain unchanged.
-5. Duplicate grouping preserves every source record and changes timeline visibility. The measured fixes add exact image-subset matching and high-confidence model confirmation for tightly screened near copies. Final acceptance is reported below.
+5. Duplicate grouping preserves every source record and changes timeline visibility. The measured fixes add exact image-subset matching and model confirmation for screened near copies. High-confidence redundancy is accepted; a valid uncertain decision also qualifies at clinical word-set Jaccard >= 0.85 with the same known service date and type. Distinct/different and complementary decisions veto that fallback. Failed, missing, incomplete, or invalid responses preserve both records. Final acceptance is reported below.
 
 One background worker processes documents in order; page and summary calls run concurrently. Restart resumes interrupted work. Reuploading identical PDF bytes returns the existing document. IDs derive from PDF bytes and record page spans, so unchanged boundaries preserve reviewer overrides.
 
@@ -33,28 +33,28 @@ One background worker processes documents in order; page and summary calls run c
 
 | Feature | Behavior | Release verification |
 |---|---|---|
-| Editing | Save fields and summary; Reset restores the model version | Integrated restart/UI checks pending |
-| Retry | Saved pages/summaries are reused; interrupted work resumes | Synthetic same-process retry and restart checks pending |
-| Duplicates | Preserve source records; show canonical cards and copy sources | Final accepted Task3 data pending |
-| Evaluation | Fixed human gold, boundary/date/type metrics, date rule, optional claim judge | Final J check pending |
+| Editing | Save fields and summary; Reset restores the model version | Verified, including the known-date correction through restart |
+| Retry | Saved pages/summaries are reused; interrupted work resumes | Verified with fake call spies and clean-checkout smoke |
+| Duplicates | Preserve source records; show canonical cards and copy sources | 2/2 gold pairs, 0 false pairs after authorized uncertainty fallback |
+| Evaluation | Fixed human gold, boundary/date/type metrics, date rule, optional claim judge | 35 summaries judged; 2 unsupported claims, 0 call errors |
 
 Baseline runtime code: `5048b89f412b8c76fd8d91819469f7fdc8a0d7ac`; lane launch: `7269f0a5ef092b59ae04fee0594d0227c2e3265c`. The baseline measured run also included a live grouping patch, so its results are not attributed solely to the committed runtime. Candidate SHAs and exact evidence are in [DEMO_EVIDENCE.md](DEMO_EVIDENCE.md).
 
 | Metric | Before: saved full188 | After: integrated candidate |
 |---|---:|---:|
-| Predicted records / human gold | 36 / 31 | Pending |
-| Start precision / recall / F1 | 0.969 / 1.000 / 0.984 | Pending |
-| False starts | 1 | Pending |
-| Matched gold spans | 30/31 (29 exact + 1 permitted tiled) | Pending |
-| Page assignment | 186/188 | Pending |
-| Service dates on matched spans | 29/30 | Pending |
-| Record types on matched spans | 30/30 | Pending |
-| Gold duplicate pairs / false pairs | 0/2 / 0 | Pending |
-| Date-rule violations / summaries | 0 / 36 | Pending |
-| Judge supported / total | 464/473 | Pending |
-| Judge unsupported / unclear / call errors | 6 / 3 / 0 | Pending |
+| Predicted records / human gold | 36 / 31 | 35 / 31 |
+| Start precision / recall / F1 | 0.969 / 1.000 / 0.984 | 1.000 / 1.000 / 1.000 |
+| False starts | 1 | 0 |
+| Matched gold spans | 30/31 (29 exact + 1 permitted tiled) | 31/31 (30 exact + 1 permitted tiled) |
+| Page assignment | 186/188 | 188/188 |
+| Service dates on matched spans | 29/30 | 30/31 (one accepted known miss) |
+| Record types on matched spans | 30/30 | 31/31 |
+| Gold duplicate pairs / false pairs | 0/2 / 0 | 2/2 / 0 |
+| Date-rule violations / summaries | 0 / 36 | 0 / 35 |
+| Judge supported / total | 464/473 | 496/499 |
+| Judge unsupported / unclear / call errors | 6 / 3 / 0 | 2 / 1 / 0 |
 
-The target is 31/31 matched gold spans, including permitted internal partitions, rather than 31 literal predicted spans. Final dates and types must use the actual matched denominator. Judge input is transcription with length limits; judging does not verify every original image or establish clinical truth.
+The result is 31/31 matched gold spans, including permitted internal partitions, rather than 31 literal predicted spans. Final dates and types must use the actual matched denominator. Judge input is transcription with length limits; judging does not verify every original image or establish clinical truth.
 
 ## Assumptions and limits
 
@@ -63,6 +63,7 @@ The target is 31/31 matched gold spans, including permitted internal partitions,
 - Service dates take priority. Report/fax dates may be approximate fallbacks; birth and injury dates are not service dates.
 - A bundle can start mid-record. Fax page 2 with a complete heading may simply follow a removed cover sheet.
 - The preserved measured grouping patch normalizes fax timestamps, tolerates header drift while counters continue, and recognizes printed-page restarts inside a fax. The narrow new fix preserves printed page 1-to-2 continuity when classification drifts, unless a heading, fax reset, or conflicting service date says otherwise.
+- **Known date miss:** r24 (pages 151–152) is the one model service-date error. The source Visit 10-02-2024 appears in a sub-readable header strip. The user accepted this limitation and stopped further extraction. Model accuracy remains 30/31; the demo corrects the effective date to `2024-10-02` with a persisted reviewer override. The model value and gold remain unchanged.
 - Source conflicts, laterality, restrictions, and uncertain dates remain matters for reviewer inspection. Do not silently resolve contradictory medical evidence.
 - Overrides remain attached to deterministic record IDs. A changed boundary creates a different record ID; edits are not automatically transferred to it.
 - Synthetic smoke results prove application behavior, not extraction accuracy. Medical artifacts and raw evaluation claims remain ignored and local.
@@ -93,12 +94,12 @@ Task2 alone owns targeted refresh of sample pages 151–152. Other pages reuse c
 1. Open the warmed timeline; on the Mac use the prepared SSH tunnel to the demo server.
 2. Show the completed document and its 188 source pages.
 3. Open pages 37–41 and show they form one record with a boundary explanation.
-4. Open the record covering pages 151–152 and compare its service date with the image.
+4. Open r24 (pages 151–152), compare the source header, edit its service date to `2024-10-02`, Save, refresh, restart the server, and verify the persisted override. Reset only after demonstrating persistence.
 5. Show the exact subset duplicate and open both source spans.
-6. Show the confirmed near duplicate with both sources; toggle Show duplicates.
+6. Show the near duplicate with both sources; explain the valid-uncertain >= 0.85 fallback and toggle Show duplicates.
 7. Show the distinct physical-therapy visits and the complementary operative records remain separate.
-8. Edit a title, Save, refresh, restart the demo server, verify persistence, then Reset.
+8. Edit a title and summary, Save, refresh, and demonstrate Reset to the untouched model version.
 9. In the separate synthetic retry tab, show four saved pages, click Retry without restarting, and show 12 completed pages.
 10. Open this before/after table and state the remaining limitations and actual acceptance results.
 
-The mandatory Mac walkthrough is not yet verified. Server, tunnel, and rehearsal evidence will be recorded explicitly; an API or browser test does not substitute for the Mac walkthrough.
+The mandatory Mac walkthrough remains unverified: the coordinator reports all three Mac peers offline, and `samples/record_1_part.pdf` is absent on this VPS. The integrated server handoff is being prepared. From a reachable Mac, run `ssh -L 8000:127.0.0.1:8000 vps`, open http://127.0.0.1:8000, and upload that part PDF if available. This newly requested upload is authorized; rerunning full188 extraction is prohibited. Linux headless-browser checks do not establish that the Mac tunnel/upload worked.

@@ -1,7 +1,7 @@
 """Exact image containment and conservative, model-confirmed duplicate detection.
 
 Every member is compared directly with the longest canonical record. Image evidence
-wins over OCR discrepancies; similarity only proposes a pair, never hides a record.
+wins over OCR discrepancies; near matches require a valid model decision.
 The API's awaitable wrapper and the existing duplicate-table shape are preserved.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .. import config, db, llm
 from .prompts_util import load_prompt
@@ -24,6 +24,7 @@ from .prompts_util import load_prompt
 log = logging.getLogger(__name__)
 
 NEAR_THRESHOLD = 0.8   # Candidate only: confirmation is mandatory
+UNCERTAIN_THRESHOLD = 0.85  # Explicit uncertainty may qualify under the F2 rule
 SHINGLE_SIZE = 3       # words per shingle
 MIN_WORDS = 8          # shorter normalized texts (blank or failed pages) never take part
 PAIRING_FIELDS = ("date_of_service", "record_type", "hidden")   # override fields that drive the pairing
@@ -171,7 +172,7 @@ def exact_relation(a: dict, b: dict) -> str | None:
 
 class DuplicateConfirmation(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    relation: Literal["duplicate", "complementary", "distinct", "uncertain"]
+    relation: Literal["duplicate", "complementary", "distinct", "different", "uncertain"]
     confidence: Literal["high", "medium", "low"]
     reason: str = Field(min_length=1)
     a_pages: list[int]
@@ -187,18 +188,47 @@ def confirmed_duplicate(decision: DuplicateConfirmation, a: dict, b: dict) -> bo
             and set(decision.b_pages) == set(range(b["start_page"], b["end_page"] + 1)))
 
 
+def confirmation_reason(decision, a: dict, b: dict) -> str | None:
+    """Shared F2 policy; only validated, complete decisions can hide a near copy.
+
+    The uncertain fallback intentionally does not require a high-confidence
+    duplicate verdict or an empty unique_content explanation. Explicit distinct,
+    different and complementary verdicts always veto this fallback.
+    """
+    if decision is None:
+        return None
+    try:
+        payload = decision.model_dump() if isinstance(decision, DuplicateConfirmation) else decision
+        decision = DuplicateConfirmation.model_validate(payload, strict=True)
+    except ValidationError:
+        return None
+    if (not a.get("text_complete", True) or not b.get("text_complete", True)
+            or len(a.get("transcription", a.get("text", "")))
+            + len(b.get("transcription", b.get("text", ""))) > 80000
+            or candidate_score(a, b) < NEAR_THRESHOLD):
+        return None
+    if confirmed_duplicate(decision, a, b):
+        return "similar_confirmed"
+    if (decision.relation == "uncertain"
+            and set(decision.a_pages) == set(range(a["start_page"], a["end_page"] + 1))
+            and set(decision.b_pages) == set(range(b["start_page"], b["end_page"] + 1))
+            and candidate_score(a, b) >= UNCERTAIN_THRESHOLD):
+        return "similar"
+    return None
+
+
 def _rows_for_group(a: dict, members: list[dict]) -> list[dict]:
     if not members:
         return []
     reasons = {m["reason"] for m in members}
-    reason = next(r for r in ("similar_confirmed", "partial_exact", "exact_image", "exact") if r in reasons)
+    reason = next(r for r in ("similar", "similar_confirmed", "partial_exact", "exact_image", "exact") if r in reasons)
     return [{"record_id": a["id"], "group_id": a["id"], "is_canonical": 1,
              "reason": reason, "score": 1.0}, *members]
 
 
 def _member(a: dict, b: dict, reason: str, score: float = 1.0) -> dict:
     return {"record_id": b["id"], "group_id": a["id"], "is_canonical": 0,
-            "reason": reason, "score": round(score, 6)}
+            "reason": reason, "score": score}
 
 
 def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD, *,
@@ -218,9 +248,7 @@ def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD, *,
                 score = candidate_score(a, b)
                 decision = (confirmations or {}).get((a["id"], b["id"]))
                 if score >= max(threshold, NEAR_THRESHOLD) and decision is not None:
-                    decision = DuplicateConfirmation.model_validate(decision)
-                    if confirmed_duplicate(decision, a, b):
-                        reason = "similar_confirmed"
+                    reason = confirmation_reason(decision, a, b)
             if reason:
                 members.append(_member(a, b, reason, score))
                 assigned.add(b["id"])
@@ -275,10 +303,9 @@ def _load_items() -> list[dict]:
     return sorted(items, key=_canonical_key)
 
 
-async def confirm_pair(a: dict, b: dict) -> DuplicateConfirmation:
+async def confirm_pair(a: dict, b: dict) -> DuplicateConfirmation | None:
     if config.FAKE_LLM:
-        return DuplicateConfirmation(relation="uncertain", confidence="low", reason="fake mode",
-                                     a_pages=[], b_pages=[], unique_content="not assessed")
+        return None  # A skipped call is not a valid uncertain model response.
     if config.OPENAI_MODEL != "gpt-6-luna":
         raise ValueError("duplicate confirmation requires gpt-6-luna")
     system, template = load_prompt("duplicate_confirm")
@@ -293,7 +320,8 @@ async def dedupe_all(*, exact_only: bool = False, max_confirmations: int = 8,
                      evidence: list[dict] | None = None) -> None:
     """Serialize recomputation; disk/hash/SQLite work runs off the event loop.
 
-    A failed, incomplete, over-budget or uncertain confirmation keeps both records.
+    Failed, incomplete and over-budget calls keep both records. Valid uncertainty
+    follows the shared F2 similarity rule.
     Publish atomically only after the complete pass; cancellation leaves the prior table.
     """
     while not _recompute_lock.acquire(blocking=False):
@@ -324,13 +352,19 @@ async def dedupe_all(*, exact_only: bool = False, max_confirmations: int = 8,
                             calls += 1
                             try:
                                 decision = await confirm_pair(a, b)
-                                entry["decision"] = decision.model_dump()
-                                if confirmed_duplicate(decision, a, b):
-                                    reason = "similar_confirmed"
+                                if decision is None:
+                                    entry["skipped"] = "no confirmation"
+                                else:
+                                    decision = DuplicateConfirmation.model_validate(
+                                        decision.model_dump() if isinstance(decision, DuplicateConfirmation)
+                                        else decision, strict=True)
+                                    entry["decision"] = decision.model_dump()
+                                    reason = confirmation_reason(decision, a, b)
                             except Exception as exc:
                                 # Never log source text carried by adapter validation errors.
                                 entry["error"] = type(exc).__name__
-                        entry["accepted"] = reason == "similar_confirmed"
+                        entry["accepted"] = reason in {"similar_confirmed", "similar"}
+                        entry["reason"] = reason
                         if evidence is not None:
                             evidence.append(entry)
                 if reason:

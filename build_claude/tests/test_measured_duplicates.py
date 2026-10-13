@@ -86,7 +86,7 @@ def test_similarity_alone_never_collapses_even_high_boilerplate_overlap():
 
 
 @pytest.mark.parametrize("changes", [
-    {"relation": "uncertain"}, {"relation": "complementary"}, {"relation": "distinct"},
+    {"relation": "different"}, {"relation": "complementary"}, {"relation": "distinct"},
     {"confidence": "medium"}, {"confidence": "low"}, {"unique_content": "additional restriction"},
     {"a_pages": []}, {"b_pages": [999]},
 ])
@@ -205,15 +205,67 @@ def test_confirmation_budget_caps_calls_and_never_retries_reversed_pair(monkeypa
                     transcription=common + f" extra{n}") for n in range(6)]
     calls, evidence, published = [], [], []
 
-    async def uncertain(a, b):
+    async def distinct(a, b):
         calls.append((a["id"], b["id"]))
-        return decision(a, b, relation="uncertain")
+        return decision(a, b, relation="distinct")
 
     monkeypatch.setattr(dedupe, "_load_items", lambda: items)
-    monkeypatch.setattr(dedupe, "confirm_pair", uncertain)
+    monkeypatch.setattr(dedupe, "confirm_pair", distinct)
     monkeypatch.setattr(db, "replace_duplicate_groups", published.extend)
     asyncio.run(dedupe.dedupe_all(max_confirmations=8, evidence=evidence))
     assert len(calls) == 8
     assert len({frozenset(pair) for pair in calls}) == 8
     assert len(evidence) == 15 and not published
     assert sum(e.get("skipped") == "confirmation budget" for e in evidence) == 7
+
+
+@pytest.mark.parametrize("score,expected", [(0.8, False), (0.849999, False), (0.85, True), (0.96, True)])
+def test_valid_uncertain_fallback_has_inclusive_point85_threshold(monkeypatch, score, expected):
+    a, b = near_pair()
+    monkeypatch.setattr(dedupe, "candidate_score", lambda *_: score)
+    rows = dedupe.find_duplicates([a, b], confirmations={('a', 'b'): decision(
+        a, b, relation='uncertain', confidence='medium', unique_content='Ambiguous signature state')})
+    assert bool(rows) is expected
+    if rows:
+        assert all(r['reason'] == 'similar' for r in rows)
+        assert next(r for r in rows if r['record_id'] == 'b')['score'] == score
+
+
+@pytest.mark.parametrize('change', [
+    {'date_of_service': None}, {'date_of_service': '2025-01-02'},
+    {'record_type': None}, {'record_type': 'physical_therapy'},
+])
+def test_uncertain_fallback_preserves_same_date_and_same_type_gates(change):
+    a, b = near_pair()
+    b.update(change)
+    assert dedupe.find_duplicates([a, b], confirmations={('a', 'b'): decision(a, b, relation='uncertain')}) == []
+
+
+@pytest.mark.parametrize('bad', [None, {}, {'relation': 'uncertain'}, 'uncertain'])
+def test_missing_or_invalid_response_is_never_uncertainty(bad):
+    a, b = near_pair()
+    assert dedupe.find_duplicates([a, b], confirmations={('a', 'b'): bad}) == []
+
+
+@pytest.mark.parametrize('outcome', ['uncertain', 'distinct', 'different', 'complementary', 'invalid', 'missing', 'error'])
+def test_production_fallback_requires_valid_uncertain_response(monkeypatch, outcome):
+    a, b = near_pair()
+    for item in (a, b):
+        item.update(text_complete=True, transcription=item['text'])
+    published, evidence = [], []
+    async def confirm(*_):
+        if outcome == 'error':
+            raise RuntimeError('synthetic failure')
+        if outcome == 'missing':
+            return None
+        if outcome == 'invalid':
+            return {'relation': 'uncertain'}
+        return decision(a, b, relation=outcome, confidence='medium')
+    monkeypatch.setattr(dedupe, '_load_items', lambda: [a, b])
+    monkeypatch.setattr(dedupe, 'confirm_pair', confirm)
+    monkeypatch.setattr(db, 'replace_duplicate_groups', published.extend)
+    asyncio.run(dedupe.dedupe_all(evidence=evidence))
+    assert bool(published) == (outcome == 'uncertain')
+    assert evidence[0]['accepted'] == (outcome == 'uncertain')
+    if published:
+        assert all(row['reason'] == 'similar' for row in published)

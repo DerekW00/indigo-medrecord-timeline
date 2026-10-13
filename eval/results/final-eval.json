@@ -1,0 +1,108 @@
+{
+  "doc_id": "d820c27277834856d2c017c4a3ff40f42a67cf1d6e70fcf088d65691a1cf1c50",
+  "filename": "record_1.pdf",
+  "document_status": "done",
+  "run_at": "2026-10-13T22:32:27+00:00",
+  "model": "gpt-6-luna",
+  "fake_llm": false,
+  "description": "Final cached replay and fresh judge; no extraction",
+  "artifact_scope": "Aggregate release evidence; raw clinical claims remain in ignored local data",
+  "gold_path": "eval/gold/record_1.json",
+  "gold_sha256": "feed4fa2498a0146db63635665ee9100e74f29e47a916aaaec42b5719294cba9",
+  "raw_report_sha256": "258cadd3ab59b5cf5050df73424c7b2da6bfc8b9b57db777ee255bf25b58f5ae",
+  "boundaries": {
+    "labeled_pages": [
+      1,
+      188
+    ],
+    "n_gold": 31,
+    "n_pred": 35,
+    "starts": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 31,
+      "fp": 0,
+      "fn": 0,
+      "dropped_internal": 4
+    },
+    "spans": {
+      "rate": 1.0,
+      "matched": 31,
+      "exact": 30,
+      "tiled": 1,
+      "total": 31
+    },
+    "pages": {
+      "accuracy": 1.0,
+      "hits": 188,
+      "total": 188,
+      "uncovered_pages": 0
+    },
+    "fields": {
+      "n_matched": 31,
+      "date_accuracy": 0.9677,
+      "date_hits": 30,
+      "type_accuracy": 1.0,
+      "type_hits": 31
+    },
+    "duplicates": {
+      "gold_pairs": 2,
+      "hits": 2,
+      "hit_rate": 1.0,
+      "false_pairs": 0
+    }
+  },
+  "date_rule": {
+    "records_checked": 35,
+    "violations": 0
+  },
+  "judge": {
+    "records_judged": 35,
+    "errors": 0,
+    "claims": 472,
+    "supported": 468,
+    "unsupported": 2,
+    "unclear": 2,
+    "supported_rate": 0.9915,
+    "unsupported_spans": [
+      {
+        "span": [
+          157,
+          165
+        ],
+        "count": 1
+      },
+      {
+        "span": [
+          185,
+          188
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "date_misses": [
+    {
+      "gold_id": "r24",
+      "gold_date": "2024-10-02",
+      "pred_date": "2024-11-12"
+    }
+  ],
+  "replay": {
+    "new_extraction_calls": 0,
+    "reused_saved_real_duplicate_decisions": 1,
+    "new_duplicate_confirmation_calls": 0,
+    "new_judge_calls": 35,
+    "negative_pairs_remain_separate": true,
+    "near_candidate_threshold": 0.85,
+    "near_pair_score": 0.8805309734513275
+  },
+  "evaluation_code_commit": "6eea00657720888836e97248df90183d3f49cbc3",
+  "known_limits": [
+    "One model date error (r24); reviewer editing demo preserves original model value.",
+    "35 predictions cover 31 gold records using four allowed internal starts.",
+    "Judge evaluates capped transcriptions, not original page images.",
+    "Judge labels vary between runs; this artifact reports the fresh final run."
+  ]
+}

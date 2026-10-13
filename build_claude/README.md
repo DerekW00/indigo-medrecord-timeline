@@ -1,10 +1,10 @@
 # Medical Record Timeline
 
-Review one patient's scanned medical-record PDF bundles in one chronological timeline. Each record has a date, title, summary, and linked source pages. The screen provides upload progress above the timeline, filters and duplicate visibility, and a source/detail editor.
+Review one patient's scanned medical-record PDF bundles in a combined chronological timeline. Each record has a date, title, summary, and links to its original pages and transcription. The screen has upload progress at the top, a filterable timeline on the left, and a source viewer and editor on the right.
 
 ## Quick start
 
-Run from the repository root. Install `uv` first if it is not available.
+From a clean checkout, with Python 3.11+ and `uv` available:
 
 ```bash
 cd build_claude
@@ -15,91 +15,101 @@ cp env.example .env
 .venv/bin/python -m app
 ```
 
-Open http://127.0.0.1:8000 and drop one or more PDFs. Files, page images, edits, and checkpoints are stored locally in `MRT_DATA_DIR` (default `build_claude/data`). Extraction sends page images to OpenAI; summarization, duplicate confirmation, and optional judging send text to OpenAI. Local storage does not mean offline model processing. Set `MRT_FAKE_LLM=1` for synthetic development and smoke tests; fake output is not a medical interpretation.
+Open http://127.0.0.1:8000 and drop one or more PDFs. No Node build, system OCR packages, authentication, or cloud storage are required. PDFs, images, checkpoints, and edits stay in `MRT_DATA_DIR` (default `build_claude/data`). Page images and record text are sent to OpenAI for model processing.
 
-`env.example` lists configuration. `MRT_PORT` selects the loopback port; `MRT_CONCURRENCY` defaults to 16; `MRT_MAX_PAGES=12` limits a development run. The demo reuses accepted cached data and does not re-extract the 188-page sample. Never share a data directory between a worker and a replay/eval process.
+Configuration is in [env.example](env.example). Concurrency defaults to **16**, matching the measured build; `MRT_MAX_PAGES=12` limits new development runs. `MRT_FAKE_LLM=1` produces synthetic output for offline checks. It is not used for the reported medical-record evaluation.
 
 ## How it works
 
-1. PyMuPDF renders pages to JPEG without external OCR tools.
-2. A vision call transcribes each page and identifies boundary/date signals. Each completed page is saved immediately in SQLite.
-3. Deterministic grouping uses printed page continuity, fax transmissions, headings, record types, and service dates. Cover pages attach forward; mid-record starts receive a flag. Boundary explanations are visible in the detail panel.
-4. Text calls summarize grouped transcriptions. Done summaries survive a retry when record boundaries remain unchanged.
-5. Duplicate grouping preserves every source record and changes timeline visibility. The measured fixes add exact image-subset matching and model confirmation for screened near copies. High-confidence redundancy is accepted; a valid uncertain decision also qualifies at clinical word-set Jaccard >= 0.85 with the same known service date and type. Distinct/different and complementary decisions veto that fallback. Failed, missing, incomplete, or invalid responses preserve both records. Final acceptance is reported below.
+1. **Render:** PyMuPDF creates a JPEG per page, with a 1600-pixel long side.
+2. **Extract:** `gpt-6-luna` transcribes each page and returns typed boundary/date signals. Each completed page is saved immediately.
+3. **Group:** deterministic Python rules form record spans and store a readable boundary reason.
+4. **Summarize:** text calls summarize each span. Completed summaries are reused when boundaries are unchanged.
+5. **Deduplicate:** compare completed records across every uploaded PDF, preserving all source rows.
 
-One background worker processes documents in order; page and summary calls run concurrently. Restart resumes interrupted work. Reuploading identical PDF bytes returns the existing document. IDs derive from PDF bytes and record page spans, so unchanged boundaries preserve reviewer overrides.
+Grouping starts at page 1 while allowing a partial beginning. Printed page continuity can outweigh changing fax headers or noisy page classifications. A genuine heading and page-number restart can begin another document inside one fax. Otherwise fax changes, headings, and type/date changes guide boundaries. Repeated patient headers and continuation pages stay together. Cover pages attach to the following record.
 
-## Features and verification
+Exact duplicate detection uses complete page-image containment or identical clinical text. Near candidates require the same known effective date and type and clinical word-set Jaccard similarity **at least 0.85**, followed by a validated model decision. A complete high-confidence duplicate decision or valid `uncertain` decision qualifies; `different`, `distinct`, and `complementary` decisions preserve both records. Failed or incomplete confirmations never activate the fallback. Each member is checked against the canonical record, without transitive merging. Valid decisions, including vetoes, are cached using the source text, effective date/type, model, and prompt. Unchanged inputs reuse the first saved decision across uploads and restarts; changed evidence is checked again.
 
-| Feature | Behavior | Release verification |
-|---|---|---|
-| Editing | Save fields and summary; Reset restores the model version | Verified, including the known-date correction through restart |
-| Retry | Saved pages/summaries are reused; interrupted work resumes | Verified with fake call spies and clean-checkout smoke |
-| Duplicates | Preserve source records; show canonical cards and copy sources | 2/2 gold pairs, 0 false pairs after authorized uncertainty fallback |
-| Evaluation | Fixed human gold, boundary/date/type metrics, date rule, optional claim judge | 35 summaries judged; 2 unsupported claims, 0 call errors |
+The longest record is canonical, with document order and page position breaking ties. The detail panel shows each copy's evidence and actual similarity score; the known near pair scores **88.1%**. Show duplicates reveals every source occurrence.
 
-Baseline runtime code: `5048b89f412b8c76fd8d91819469f7fdc8a0d7ac`; lane launch: `7269f0a5ef092b59ae04fee0594d0227c2e3265c`. The baseline measured run also included a live grouping patch, so its results are not attributed solely to the committed runtime. Candidate SHAs and exact evidence are in [DEMO_EVIDENCE.md](DEMO_EVIDENCE.md).
+One background worker processes documents in order; calls within a document run concurrently. SQLite uses WAL and short transactions. Vision is needed because the sample has no text layer. Separating extraction from grouping and summarization permits cached replay. Deterministic IDs derived from document bytes and page spans preserve reviewer edits across retries when boundaries stay the same.
 
-| Metric | Before: saved full188 | After: integrated candidate |
+## Features and final evaluation
+
+| Feature | Delivered behavior |
+|---|---|
+| Editing | Save title, date, type, provider, and summary; edits survive restart; Reset restores model fields |
+| Retry | Per-page checkpoints, startup resume, and an injected-failure demo |
+| Duplicates | Exact partial copies and near copies collapse; all source pages remain accessible |
+| Evaluation | Adopted gold, boundary/date/type/duplicate metrics, date-presence rules, and a claim judge |
+
+The single canonical gold file is [repository-root eval/gold/record_1.json](../eval/gold/record_1.json); it is the evaluator's default. Derek adopted its 31 records and verified pages 37–41 as one record. The final handoff reports that gold boundaries were independently confirmed by a blind sweep; the stopped review's full synthesis was not available. Labels were not changed to improve scores.
+
+| Metric | Before: baseline completed 14:43 PT | After: final cached replay + fresh judge |
 |---|---:|---:|
-| Predicted records / human gold | 36 / 31 | 35 / 31 |
+| Predicted records / gold records | 36 / 31 | 35 / 31 |
 | Start precision / recall / F1 | 0.969 / 1.000 / 0.984 | 1.000 / 1.000 / 1.000 |
-| False starts | 1 | 0 |
-| Matched gold spans | 30/31 (29 exact + 1 permitted tiled) | 31/31 (30 exact + 1 permitted tiled) |
+| Matched gold spans | 30/31: 29 exact + 1 tiled | 31/31: 30 exact + 1 tiled |
 | Page assignment | 186/188 | 188/188 |
-| Service dates on matched spans | 29/30 | 30/31 (one accepted known miss) |
-| Record types on matched spans | 30/30 | 31/31 |
+| Service dates on matched spans | 29/30 | 30/31 |
+| Types on matched spans | 30/30 | 31/31 |
 | Gold duplicate pairs / false pairs | 0/2 / 0 | 2/2 / 0 |
 | Date-rule violations / summaries | 0 / 36 | 0 / 35 |
-| Judge supported / total | 464/473 | 496/499 |
-| Judge unsupported / unclear / call errors | 6 / 3 / 0 | 2 / 1 / 0 |
+| Judge supported / total claims | 464/473 (98.1%) | 468/472 (99.2%) |
+| Judge unsupported / unclear / call errors | 6 / 3 / 0 | 2 / 2 / 0 |
 
-The result is 31/31 matched gold spans, including permitted internal partitions, rather than 31 literal predicted spans. Final dates and types must use the actual matched denominator. Judge input is transcription with length limits; judging does not verify every original image or establish clinical truth.
+Reports: [baseline](../eval/results/baseline-14-43.json), [final](../eval/results/final-eval.json). They contain aggregate metrics and hashes; raw clinical claims stay in ignored local data. The final run reused 188 cached pages and one validated real duplicate decision, with **zero new extraction calls**. It made 35 fresh judge calls. An earlier post-fix judge was 496/499 supported; the table reports the latest run without selecting the better result.
 
-## Assumptions and limits
+There are 35 predictions because four internal starts partition an admission export where gold permits splitting. Thus 31/31 means matched gold spans, including one exact tiling. The judge sees capped transcriptions and key findings, not original images, and its claim counts and labels vary between runs.
 
-- All uploaded bundles belong to one patient. There is no authentication or automatic patient isolation; the server binds to loopback for local use.
-- The only application model is `gpt-6-luna`. Calls use the existing OpenAI adapter and its validated JSON fallbacks.
-- Service dates take priority. Report/fax dates may be approximate fallbacks; birth and injury dates are not service dates.
-- A bundle can start mid-record. Fax page 2 with a complete heading may simply follow a removed cover sheet.
-- The preserved measured grouping patch normalizes fax timestamps, tolerates header drift while counters continue, and recognizes printed-page restarts inside a fax. The narrow new fix preserves printed page 1-to-2 continuity when classification drifts, unless a heading, fax reset, or conflicting service date says otherwise.
-- **Known date miss:** r24 (pages 151–152) is the one model service-date error. The source Visit 10-02-2024 appears in a sub-readable header strip. The user accepted this limitation and stopped further extraction. Model accuracy remains 30/31; the demo corrects the effective date to `2024-10-02` with a persisted reviewer override. The model value and gold remain unchanged.
-- Source conflicts, laterality, restrictions, and uncertain dates remain matters for reviewer inspection. Do not silently resolve contradictory medical evidence.
-- Overrides remain attached to deterministic record IDs. A changed boundary creates a different record ID; edits are not automatically transferred to it.
-- Synthetic smoke results prove application behavior, not extraction accuracy. Medical artifacts and raw evaluation claims remain ignored and local.
-- Scope excludes a new schema, OCR engine, authentication, cloud storage, UI framework, broad regrouping, and evaluator/gold changes. The parked foundation work is excluded.
+## Assumptions, known failures, and cuts
 
-## Reproduce the checks
+- **One patient per workspace:** every uploaded bundle belongs to the same patient. The app binds to loopback and has no authentication or patient isolation.
+- **One known date miss:** r24, pages 151–152, has model date `2024-11-12`; the source visit date is `2024-10-02`. The narrow Epic header is difficult to read at 1600 pixels. Further extraction was explicitly stopped. The editing demo corrects the effective date, verifies persistence after restart, then resets to the original model value. Evaluation remains 30/31.
+- **Two unsupported final-judge claims:** spans 157–165 and 185–188 contain an absence claim unsupported by the transcription and a planned action described as completed. These remain known summary errors; original sources are available for review.
+- **Failed-page limit:** if any page still fails extraction, grouping does not run for that PDF. Saved pages remain for Retry, but that PDF contributes no timeline records until extraction succeeds. Other completed PDFs remain visible.
+- **Source uncertainty:** contradictory laterality, restrictions, historical text, and illegible fields require source inspection. Service dates take priority; report/fax dates can be approximate fallbacks. Birth and injury dates are not substituted for service dates.
+- **Changed boundaries:** IDs preserve edits only for unchanged spans. Edits are not automatically transferred to newly split records. A bundle may begin or end mid-record; the 36-page part sample ends inside a source record.
+- **Duplicate limits:** exact evidence can identify a subset copy. Near matching requires known dates/types and a bounded model-confirmation pass. Date/type/hidden edits recompute membership. Unchanged evidence reuses its saved model decision; fresh decisions on changed inputs can vary. PT pages 28–31 and 76–78 and complementary operative parts 151–152 and 157–165 remain separate.
+- **Explicit demo cache:** both real bundles reuse saved page extraction. The part bundle gets fresh summaries, including its clipped final record. Enable Show duplicates to see both PDFs in combined date order; collapsed copies retain both source links.
+- **Cuts:** no schema rewrite, OCR engine, authentication, cloud storage, UI framework, broad fuzzy matching, automatic complementary linking, or new export feature. The existing judge, sort control, source images, and editing/retry flow remain. Next work: difficult date headers, summary grounding, failed-page presentation, and migration of edits when spans change.
+
+## Reproduce verification
+
+From `build_claude`, install development browser tooling only when running browser checks:
 
 ```bash
-# Offline suite, from build_claude:
-mkdir -p data/task5
-MRT_DATA_DIR="$PWD/data/task5" MRT_FAKE_LLM=1 .venv/bin/python -m pytest -q --basetemp="$PWD/data/task5/pytest"
-# Committed clean clone; creates its own uv environment and synthetic data:
+uv pip install --python .venv/bin/python -r requirements-dev.txt
+# Use installed Chrome/Chromium, or: .venv/bin/python -m playwright install chromium
+mkdir -p data/checks
+MRT_DATA_DIR="$PWD/data/checks" MRT_TEST_SCRATCH_ROOT="$PWD/data/checks" \
+  MRT_FAKE_LLM=1 .venv/bin/python -m pytest -q tests
 .venv/bin/python -m scripts.clean_checkout_smoke --repo .. --commit "$(git rev-parse HEAD)"
 ```
 
-The clean-checkout script checks two uploads, timeline/source JPEGs, duplicate upload reuse, edit/restart/persist/reset, and a 12-page synthetic retry. With concurrency 1 and `MRT_FAIL_AT_PAGE=5`, it requires four saved pages before failure, then 12 completed pages after Retry in the same process, with completed results unchanged.
+The smoke clones the committed candidate, installs its own dependencies with `uv`, uploads two synthetic PDFs, checks source JPEGs and edit/restart/reset, and verifies Retry preserves completed pages and summaries. Full sample browser checks additionally need `MRT_UI_DATA_SOURCE` pointing to a disposable source copy and `MRT_UI_EXPECT_DUPLICATE_GROUPS=2`.
 
-For the release evaluation, use the Task5 SQLite backup of Task3's accepted store, with no server writing it:
+Evaluate an idle copy of the processed sample, without extraction:
 
 ```bash
-MRT_DATA_DIR="$PWD/data/task5/release188" MRT_FAKE_LLM=0 MRT_CONCURRENCY=16 .venv/bin/python eval/run_eval.py --doc-id d820c2727783 --gold /Users/dw/indigo/eval/gold/record_1.json --judge --out "$PWD/data/task5/post-fixes-eval.json"
+MRT_DATA_DIR=/Users/dw/indigo-integration/build_claude/data/final/release188 \
+  MRT_FAKE_LLM=0 OPENAI_MODEL=gpt-6-luna MRT_CONCURRENCY=16 \
+  .venv/bin/python -m eval.run_eval --filename record_1.pdf \
+  --gold ../eval/gold/record_1.json --judge --out data/final-eval-raw.json
 ```
 
-Task2 alone owns targeted refresh of sample pages 151–152. Other pages reuse cached extraction. The scoped helper commands, provenance, artifact hashes, and actual runs are recorded in [DEMO_EVIDENCE.md](DEMO_EVIDENCE.md); do not run the full sample pipeline for the demo.
+Do not use a store with an active worker. `--judge` makes text-model calls; omit it for deterministic metrics only. [DEMO_EVIDENCE.md](DEMO_EVIDENCE.md) records tested commits and smoke/rehearsal outcomes.
 
-## Ten-action demo
+## Eight-step demo for Derek
 
-1. Open the warmed timeline; on the Mac use the prepared SSH tunnel to the demo server.
-2. Show the completed document and its 188 source pages.
-3. Open pages 37–41 and show they form one record with a boundary explanation.
-4. Open r24 (pages 151–152), compare the source header, edit its service date to `2024-10-02`, Save, refresh, restart the server, and verify the persisted override. Reset only after demonstrating persistence.
-5. Show the exact subset duplicate and open both source spans.
-6. Show the near duplicate with both sources; explain the valid-uncertain >= 0.85 fallback and toggle Show duplicates.
-7. Show the distinct physical-therapy visits and the complementary operative records remain separate.
-8. Edit a title and summary, Save, refresh, and demonstrate Reset to the untouched model version.
-9. In the separate synthetic retry tab, show four saved pages, click Retry without restarting, and show 12 completed pages.
-10. Open this before/after table and state the remaining limitations and actual acceptance results.
+The prepared clean clone is `/Users/dw/indigo-demo`. Run server commands on the VPS and SSH on the Mac. [DEMO.md](DEMO.md) contains exact start, restart, upload, retry, and evaluation commands.
 
-The mandatory Mac walkthrough remains unverified: the coordinator reports all three Mac peers offline, and `samples/record_1_part.pdf` is absent on this VPS. The integrated server handoff is being prepared. From a reachable Mac, run `ssh -L 8000:127.0.0.1:8000 vps`, open http://127.0.0.1:8000, and upload that part PDF if available. This newly requested upload is authorized; rerunning full188 extraction is prohibited. Linux headless-browser checks do not establish that the Mac tunnel/upload worked.
+1. Start the clean-checkout server on port 8000 and open it through the Mac SSH tunnel.
+2. Drop `record_1.pdf` and `record_1_part.pdf`; show per-document progress. Explain that extraction is cached and the part bundle receives fresh summaries.
+3. Show the combined timeline. Enable Show duplicates to see both PDFs interleaved by date. Open a record's image, transcription, summary, date confidence, and boundary reason.
+4. Show 182–184 collapsed under 166–178; show 155–156 under 153–154 with its near-copy score; inspect a cross-bundle copy. Both complementary operative parts remain visible.
+5. Edit r24's date to `2024-10-02`, Save, restart the server, and verify persistence. Reset shows the unchanged model date `2024-11-12`.
+6. Open the separate synthetic retry server with failure at page 6. Upload its 12-page fixture, show pages 1–5 saved, click Retry in the same process, and show completion without repeating those pages.
+7. Show the final eval table and canonical gold. Explain the date miss, allowed internal splits, and two unsupported judge claims.
+8. State assumptions and cuts above. The operator must confirm the Mac tunnel; Linux browser verification alone does not establish it works.

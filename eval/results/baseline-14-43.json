@@ -1,0 +1,120 @@
+{
+  "doc_id": "d820c27277834856d2c017c4a3ff40f42a67cf1d6e70fcf088d65691a1cf1c50",
+  "filename": "record_1.pdf",
+  "document_status": "done",
+  "run_at": "2026-10-13T21:40:51+00:00",
+  "model": "gpt-6-luna",
+  "fake_llm": false,
+  "description": "Before measured fixes; baseline completed 14:43 PT",
+  "artifact_scope": "Aggregate release evidence; raw clinical claims remain in ignored local data",
+  "gold_path": "eval/gold/record_1.json",
+  "gold_sha256": "feed4fa2498a0146db63635665ee9100e74f29e47a916aaaec42b5719294cba9",
+  "raw_report_sha256": "d454bc41f73a6be645d8e9b39e948e9a1197c4cc74e288d2f46c2822e68b588f",
+  "boundaries": {
+    "labeled_pages": [
+      1,
+      188
+    ],
+    "n_gold": 31,
+    "n_pred": 36,
+    "starts": {
+      "precision": 0.9688,
+      "recall": 1.0,
+      "f1": 0.9841,
+      "tp": 31,
+      "fp": 1,
+      "fn": 0,
+      "dropped_internal": 4
+    },
+    "spans": {
+      "rate": 0.9677,
+      "matched": 30,
+      "exact": 29,
+      "tiled": 1,
+      "total": 31
+    },
+    "pages": {
+      "accuracy": 0.9894,
+      "hits": 186,
+      "total": 188,
+      "uncovered_pages": 0
+    },
+    "fields": {
+      "n_matched": 30,
+      "date_accuracy": 0.9667,
+      "date_hits": 29,
+      "type_accuracy": 1.0,
+      "type_hits": 30
+    },
+    "duplicates": {
+      "gold_pairs": 2,
+      "hits": 0,
+      "hit_rate": 0.0,
+      "false_pairs": 0
+    }
+  },
+  "date_rule": {
+    "records_checked": 36,
+    "violations": 0
+  },
+  "judge": {
+    "records_judged": 36,
+    "errors": 0,
+    "claims": 473,
+    "supported": 464,
+    "unsupported": 6,
+    "unclear": 3,
+    "supported_rate": 0.981,
+    "unsupported_spans": [
+      {
+        "span": [
+          54,
+          55
+        ],
+        "count": 1
+      },
+      {
+        "span": [
+          92,
+          97
+        ],
+        "count": 1
+      },
+      {
+        "span": [
+          104,
+          124
+        ],
+        "count": 1
+      },
+      {
+        "span": [
+          137,
+          148
+        ],
+        "count": 1
+      },
+      {
+        "span": [
+          151,
+          152
+        ],
+        "count": 1
+      },
+      {
+        "span": [
+          182,
+          184
+        ],
+        "count": 1
+      }
+    ]
+  },
+  "date_misses": [
+    {
+      "gold_id": "r24",
+      "gold_date": "2024-10-02",
+      "pred_date": "2024-10-22"
+    }
+  ]
+}

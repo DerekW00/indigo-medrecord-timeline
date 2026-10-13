@@ -68,6 +68,10 @@ def seed(source_data: Path, target: Path, manifest: dict) -> None:
     with sqlite3.connect(f"file:{source_db}?mode=ro", uri=True) as original:
         with sqlite3.connect(target / "app.db") as copied:
             original.backup(copied)
+    confirmations = source_data / "duplicate_confirmations"
+    if confirmations.exists():
+        assert confirmations.is_dir()
+        shutil.copytree(confirmations, target / "duplicate_confirmations")
     with sqlite3.connect(target / "app.db") as conn:
         conn.row_factory = sqlite3.Row
         documents = conn.execute("SELECT id,status FROM documents").fetchall()

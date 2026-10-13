@@ -179,6 +179,8 @@ def test_full188_sources_filters_edit_restart_reset(browser):
 
 
 def test_two_uploads_duplicates_and_polling_while_typing(browser):
+    from playwright.sync_api import expect
+
     with scratch('uploads-browser-') as directory, Server(directory, MRT_TEST_DELAY='0.15') as server:
         page = browser.new_page(viewport={'width': 1440, 'height': 1000})
         page.goto(server.url)
@@ -203,14 +205,42 @@ def test_two_uploads_duplicates_and_polling_while_typing(browser):
         page.locator('.badge.copies').wait_for()
         assert page.locator('.badge.copies').first.text_content() == '2 copies'
         wait_cards(page, 1)
-        page.locator('#filter-dups').check()
+        expect(page.locator('#timeline-count')).to_have_text('1 records · 1 duplicate copies hidden · 0 edited')
+        page.locator('.card button.copies').click()
+        expect(page.locator('#filter-dups')).to_be_checked()
         wait_cards(page, 2)
+        expect(page.locator('#timeline-count')).to_have_text('2 records · 0 duplicate copies hidden · 0 edited')
         page.locator('#filter-dups').uncheck()
         wait_cards(page, 1)
         open_card(page, record_id)
         page.locator('.dup-list button').click()
         page.locator('.detail-head .dupchip').wait_for()
         assert page.locator('figure.page').count() == 4
+        page.locator('#filter-dups').check()
+        wait_cards(page, 2)
+        page.locator('[name=title]').fill('Edited copy')
+        page.get_by_role('button', name='Save', exact=True).click()
+        expect(page.locator('#detail h2')).to_have_text('Edited copy')
+        expect(page.locator('#timeline-count')).to_have_text('2 records · 0 duplicate copies hidden · 1 edited')
+        page.get_by_role('button', name='Hide from timeline', exact=True).click()
+        wait_cards(page, 1)
+        expect(page.locator('#timeline-count')).to_have_text('1 records · 0 duplicate copies hidden · 0 edited')
+        page.locator('#filter-hidden').check()
+        wait_cards(page, 2)
+        expect(page.locator('#timeline-count')).to_have_text('2 records · 0 duplicate copies hidden · 1 edited')
+        page.get_by_role('button', name='Unhide', exact=True).click()
+        expect(page.get_by_role('button', name='Hide from timeline', exact=True)).to_be_visible()
+        # An explicit badge click widens a source filter when the copy is in another PDF.
+        page.locator('#filter-hidden').uncheck()
+        page.locator('#filter-dups').uncheck()
+        page.locator('#filter-doc').select_option(first_doc)
+        wait_cards(page, 1)
+        page.locator('.card button.copies').click()
+        wait_cards(page, 2)
+        expect(page.locator('#filter-doc')).to_have_value('')
+        expect(page.locator('#filter-dups')).to_be_checked()
+        expect(page.locator('.card.dup')).to_be_focused()
+        expect(page.locator('.card.dup')).to_be_in_viewport()
         page.close()
 
 
@@ -223,6 +253,8 @@ def test_browser_same_process_retry(browser):
             'name': 'synthetic-retry.pdf', 'mimeType': 'application/pdf', 'buffer': synthetic_pdf()})
         page.get_by_role('button', name='Retry', exact=True).wait_for()
         assert '4/12' in page.locator('#doc-list').text_content()
+        assert page.locator('#doc-list .stage').text_content() == 'Failed'
+        assert len(server.rows("SELECT page_no FROM pages WHERE status='done'")) == 4
         pid = server.process.pid
         page.get_by_role('button', name='Retry', exact=True).click()
         page.locator('#doc-list .status-done').wait_for()
@@ -273,3 +305,126 @@ def test_known_date_miss_reviewer_correction_survives_restart(browser):
             assert server.client.get(path).json()['date_of_service'] == original
             assert server.calls() == {}, 'Known-date demo must reuse every real extraction/summary'
             page.close()
+
+
+def test_calendar_dates_detail_clamp_and_progress_labels(browser):
+    """Exercise display contracts in a real LA browser, using controlled API data."""
+    from playwright.sync_api import expect
+
+    with scratch('polish-browser-') as directory, Server(directory) as server:
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000},
+                                timezone_id='America/Los_Angeles')
+        summary = 'This is the complete synthetic source summary. ' * 60 + 'Final finding remains available.'
+        record = dict(id='calendar', doc_id='fixture', filename='synthetic.pdf', start_page=1,
+                      end_page=1, title='Effective reviewer title', date_of_service='2025-12-29',
+                      date_confidence='approximate', record_type='office_visit', provider=None,
+                      summary=summary, edited=True, model={'title': 'Original model title'}, pages=[])
+        unknown = {**record, 'id': 'unknown', 'date_of_service': None,
+                   'date_confidence': 'unknown', 'edited': False}
+        documents = [dict(id='fixture', filename='synthetic.pdf', status='queued',
+                          stage_done=3, stage_total=12, page_count=12)]
+        page.route('**/api/documents', lambda route: route.fulfill(json=documents))
+        page.route('**/api/timeline?*', lambda route: route.fulfill(json=[record, unknown]))
+        page.route('**/api/records/calendar', lambda route: route.fulfill(json=record))
+        page.route('**/api/records/unknown', lambda route: route.fulfill(json=unknown))
+        page.goto(server.url)
+        wait_cards(page, 2)
+        expect(page.locator('.month').first).to_have_text('December 2025')
+        assert page.locator('.month').first.evaluate('(el) => getComputedStyle(el).textTransform') == 'none'
+        expect(page.locator('.month').last).to_have_text('Undated')
+        expect(page.locator('.card[data-id=calendar] .date')).to_have_text('~Dec 29, 2025')
+        expect(page.locator('.card[data-id=unknown] .date')).to_have_text('undated')
+        expect(page.locator('#timeline-count')).to_have_text('2 records · 0 duplicate copies hidden · 1 edited')
+        card_summary = page.locator('.card[data-id=calendar] .summary')
+        assert card_summary.evaluate('(el) => getComputedStyle(el).webkitLineClamp') == '3'
+        assert card_summary.evaluate('(el) => getComputedStyle(el).overflow') == 'hidden'
+        assert card_summary.evaluate('(el) => el.scrollHeight > el.clientHeight')
+        open_card(page, 'calendar')
+        expect(page.locator('#detail h2')).to_have_text('Effective reviewer title')
+        expect(page.locator('.record-date')).to_have_text('~Dec 29, 2025 · Approximate date')
+        expect(page.locator('[name=date_of_service]')).to_have_value('2025-12-29')
+        expect(page.locator('[name=summary]')).to_have_value(summary)
+        assert page.locator('[name=summary]').evaluate('(el) => getComputedStyle(el).webkitLineClamp') == 'none'
+        expect(page.locator('.model-value .v')).to_have_text('Original model title')
+        open_card(page, 'unknown')
+        expect(page.locator('.record-date')).to_have_text('undated · Date unknown')
+        labels = [('queued', 'Queued'), ('rendering', 'Rendering pages'),
+                  ('extracting', 'Reading pages 3/12'), ('grouping', 'Grouping records'),
+                  ('summarizing', 'Writing summaries 3/12'), ('deduping', 'Checking duplicates'),
+                  ('done', 'Done'), ('failed', 'Failed'), ('interrupted', 'Interrupted')]
+        for status, label in labels:
+            documents[0]['status'] = status
+            expect(page.locator('#doc-list .stage')).to_have_text(label)
+            row = page.locator('#doc-list .stage').locator('..')
+            expect(row).to_have_text(label + ('3/12Retry' if status in ('failed', 'interrupted') else ''))
+        assert server.calls() == {}
+        page.close()
+
+
+def test_duplicate_badge_waits_for_pending_timeline_and_preserves_filters(browser):
+    from playwright.sync_api import expect
+    from urllib.parse import parse_qs, urlparse
+
+    with scratch('copy-navigation-browser-') as directory, Server(directory) as server:
+        page = browser.new_page(viewport={'width': 1440, 'height': 700})
+        base = dict(doc_id='fixture', filename='synthetic.pdf', start_page=1, end_page=1,
+                    title='Synthetic record', date_of_service='2025-12-29', date_confidence='exact',
+                    record_type='office_visit', summary='Synthetic text. ' * 30, pages=[])
+        copy = {**base, 'id': 'copy', 'duplicate': {'is_canonical': False}}
+        canonical = {**base, 'id': 'canonical', 'duplicate': {
+            'is_canonical': True, 'copies': 2, 'others': [{'id': 'copy'}, {'id': 'copy'}]}}
+        fillers = [{**base, 'id': f'filler-{i}'} for i in range(12)]
+        held = []
+        hold_next = [False]
+
+        def timeline(route):
+            query = parse_qs(urlparse(route.request.url).query)
+            items = [canonical, *fillers]
+            if query.get('include_duplicates') == ['1']:
+                items.append(copy)
+            if hold_next[0]:
+                hold_next[0] = False
+                held.append((route, items))
+            else:
+                route.fulfill(json=items)
+
+        page.route('**/api/documents', lambda r: r.fulfill(json=[{
+            'id': 'fixture', 'filename': 'synthetic.pdf', 'status': 'done'}]))
+        page.route('**/api/timeline?*', timeline)
+        page.route('**/api/records/canonical', lambda r: r.fulfill(json=canonical))
+        page.goto(server.url)
+        wait_cards(page, 13)
+        expect(page.locator('#timeline-count')).to_have_text('13 records · 1 duplicate copies hidden · 0 edited')
+        open_card(page, 'canonical')
+        page.locator('[name=title]').fill('Unsaved selection stays intact')
+        page.locator('#filter-type').select_option('office_visit')
+        page.locator('#filter-doc').select_option('fixture')
+        page.wait_for_timeout(100)
+        hold_next[0] = True
+        page.locator('#sort-btn').click()
+        page.wait_for_timeout(100)
+        assert held
+        badge = page.locator('.card[data-id=canonical] button.copies')
+        badge.focus()
+        badge.press('Enter')
+        expect(page.locator('#filter-dups')).to_be_checked()
+        route, items = held.pop()
+        route.fulfill(json=items)
+        wait_cards(page, 14)
+        expect(page.locator('#timeline-count')).to_have_text('14 records · 0 duplicate copies hidden · 0 edited')
+        expect(page.locator('.card[data-id=copy]')).to_be_focused()
+        expect(page.locator('.card[data-id=copy]')).to_be_in_viewport()
+        expect(page.locator('[name=title]')).to_have_value('Unsaved selection stays intact')
+        expect(page.locator('.card[data-id=canonical]')).to_have_class('card selected')
+        expect(page.locator('#filter-type')).to_have_value('office_visit')
+        expect(page.locator('#filter-doc')).to_have_value('fixture')
+        badge.click()
+        expect(page.locator('.card[data-id=copy]')).to_be_focused()
+        expect(page.locator('#filter-dups')).to_be_checked()
+        badge.focus()
+        badge.press('Space')
+        expect(page.locator('.card[data-id=copy]')).to_be_focused()
+        expect(page.locator('#filter-dups')).to_be_checked()
+        expect(page.locator('[name=title]')).to_have_value('Unsaved selection stays intact')
+        assert server.calls() == {}
+        page.close()

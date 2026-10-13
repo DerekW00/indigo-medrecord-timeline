@@ -38,6 +38,7 @@ const state = {
   serverDown: false,
   timelineInFlight: false,
   timelineDirty: false,
+  pendingCopies: null,
 };
 
 // ---------- tiny DOM helpers ----------
@@ -82,9 +83,20 @@ function pageRange(it) {
 
 function sourceText(it) { return `${it.filename || it.doc_id || '?'} ${pageRange(it)}`; }
 
+// Format calendar components directly: never interpret a service date as an instant.
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+function calendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!match || !MONTHS[Number(match[2]) - 1]) return null;
+  return { year: match[1], month: MONTHS[Number(match[2]) - 1], day: Number(match[3]) };
+}
+
 function dateText(it) {
   if (!it.date_of_service) return 'undated';
-  return (it.date_confidence === 'approximate' ? '~' : '') + it.date_of_service;
+  const date = calendarDate(it.date_of_service);
+  const label = date ? `${date.month.slice(0, 3)} ${date.day}, ${date.year}` : it.date_of_service;
+  return (it.date_confidence === 'approximate' ? '~' : '') + label;
 }
 
 function monthKey(it) {
@@ -183,8 +195,12 @@ function renderDocuments() {
       h('div', { class: 'progress', role: 'progressbar', 'aria-valuenow': pct, 'aria-valuemin': 0, 'aria-valuemax': 100 },
         h('div', { class: 'progress-bar', style: `width:${pct}%` })),
       h('div', { class: 'doc-row' },
-        h('span', { class: 'stage' }, d.status || 'unknown'),
-        total ? h('span', { class: 'muted' }, `${done}/${total}`) : null,
+        h('span', { class: 'stage' }, ({
+          queued: 'Queued', rendering: 'Rendering pages', extracting: `Reading pages ${done}/${total}`,
+          grouping: 'Grouping records', summarizing: `Writing summaries ${done}/${total}`,
+          deduping: 'Checking duplicates', done: 'Done', failed: 'Failed', interrupted: 'Interrupted',
+        })[d.status] || 'Unknown'),
+        canRetry && total ? h('span', { class: 'muted' }, `${done}/${total}`) : null,
         canRetry ? h('button', { type: 'button', class: 'btn small', onclick: () => retryDocument(d.id) }, 'Retry') : null,
       ),
       d.error ? h('div', { class: 'error', title: d.error }, d.error) : null,
@@ -241,10 +257,12 @@ async function loadTimeline() {
       sort: f.sort,
     });
     const raw = await api('GET', '/api/timeline?' + params.toString());
+    if (state.timelineDirty) return; // A newer filter/navigation request supersedes this response.
     state.items = Array.isArray(raw) ? raw : (raw && (raw.items || raw.records)) || [];
     for (const it of state.items) if (it.record_type) state.seenTypes.add(it.record_type);
     renderTypeOptions();
     renderTimeline();
+    scrollToCopies();
   } catch (err) {
     const root = $('#timeline');
     clear(root);
@@ -288,7 +306,17 @@ function renderTimeline() {
   let items = state.items;
   if (!state.filters.showHidden) items = items.filter((it) => !it.hidden);
   const ordered = sortItems(items, state.filters.sort);
-  $('#timeline-count').textContent = `${ordered.length} record${ordered.length === 1 ? '' : 's'}`;
+  const visibleIds = new Set(ordered.map((it) => it.id));
+  const omitted = new Set();
+  if (!state.filters.includeDuplicates) {
+    for (const it of ordered) {
+      if (!it.duplicate || !it.duplicate.is_canonical) continue;
+      for (const other of it.duplicate.others || []) {
+        if (other.id && !visibleIds.has(other.id)) omitted.add(other.id);
+      }
+    }
+  }
+  $('#timeline-count').textContent = `${ordered.length} records · ${omitted.size} duplicate copies hidden · ${ordered.filter((it) => it.edited).length} edited`;
   if (!ordered.length) {
     const msg = state.documents.length ? 'No records to show yet. Records appear as each PDF is summarized.'
       : 'Drop a PDF bundle above to build the timeline.';
@@ -298,7 +326,11 @@ function renderTimeline() {
   let month = null;
   for (const it of ordered) {
     const key = monthKey(it) || 'Undated';
-    if (key !== month) { month = key; root.append(h('h3', { class: 'month' }, key)); }
+    if (key !== month) {
+      month = key;
+      const date = calendarDate(it.date_of_service);
+      root.append(h('h3', { class: 'month' }, date ? `${date.month} ${date.year}` : 'Undated'));
+    }
     root.append(renderCard(it));
   }
 }
@@ -312,7 +344,7 @@ function renderCard(it) {
   const open = () => selectRecord(it.id);
   return h('article', {
     class: classes.join(' '), tabindex: 0, dataset: { id: it.id }, onclick: open,
-    onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } },
+    onkeydown: (e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); } },
   },
     h('div', { class: 'card-head' },
       h('span', { class: 'date' + (it.date_of_service ? '' : ' undated') }, dateText(it)),
@@ -320,7 +352,10 @@ function renderCard(it) {
       it.partial_start ? h('span', { class: 'chip partial', title: 'This record starts mid-document' }, 'partial') : null,
       it.edited ? h('span', { class: 'chip edited', title: 'Fields edited by the reviewer' }, 'edited') : null,
       it.hidden ? h('span', { class: 'chip hidden' }, 'hidden') : null,
-      dup && dup.is_canonical && dup.copies > 1 ? h('span', { class: 'badge copies', title: 'Duplicate copies found' }, `${dup.copies} copies`) : null,
+      dup && dup.is_canonical && dup.copies > 1 ? h('button', { type: 'button', class: 'badge copies', title: 'Show duplicate copies',
+        onclick: (e) => { e.stopPropagation(); revealCopies(dup.others || []); },
+        onkeydown: (e) => e.stopPropagation(),
+      }, `${dup.copies} copies`) : null,
       dup && !dup.is_canonical ? h('span', { class: 'chip dupchip', title: 'Duplicate of another record' }, 'duplicate') : null,
     ),
     h('h4', { class: 'title' }, it.title || '(untitled record)'),
@@ -330,6 +365,36 @@ function renderCard(it) {
     ),
     h('p', { class: 'summary' }, it.summary || ''),
   );
+}
+
+function revealCopies(others) {
+  state.filters.includeDuplicates = true;
+  $('#filter-dups').checked = true;
+  state.pendingCopies = { ids: others.map((other) => other.id), widened: false };
+  loadTimeline();
+}
+
+function scrollToCopies() {
+  if (!state.pendingCopies) return;
+  const pending = state.pendingCopies;
+  const ids = pending.ids;
+  const card = Array.from(document.querySelectorAll('#timeline .card'))
+    .find((node) => ids.includes(node.dataset.id));
+  // An explicit copy request may widen source/type filters once to reveal its target.
+  if (!card && !pending.widened && (state.filters.docId || state.filters.type)) {
+    pending.widened = true;
+    state.filters.docId = '';
+    state.filters.type = '';
+    renderSourceOptions();
+    renderTypeOptions();
+    loadTimeline();
+    return;
+  }
+  state.pendingCopies = null;
+  if (card) {
+    card.scrollIntoView({ block: 'center' });
+    card.focus({ preventScroll: true });
+  }
 }
 
 function highlightSelected() {
@@ -433,6 +498,11 @@ function renderDetail(rec) {
     ),
     h('button', { type: 'button', class: 'icon-btn', title: 'Close', 'aria-label': 'Close', onclick: closeDetail }, '×'),
   ));
+
+  root.append(h('h2', { class: 'record-heading' }, rec.title || '(untitled record)'));
+  root.append(h('p', { class: 'record-date muted' }, `${dateText(rec)} · ${
+    !rec.date_of_service ? 'Date unknown' : rec.date_confidence === 'approximate'
+      ? 'Approximate date' : rec.date_confidence === 'exact' ? 'Exact date' : 'Date confidence unknown'}`));
 
   const dateNote = rec.date_confidence === 'approximate' ? 'Approximate: taken from a report or fax date.'
     : rec.date_confidence === 'unknown' ? 'No date found on the pages.' : null;

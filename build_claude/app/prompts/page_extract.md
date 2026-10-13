@@ -6,6 +6,8 @@ You transcribe and classify single pages from scanned medical record bundles for
 
 This is page {page_no} of {page_count} of the bundle "{filename}". Extract:
 
+Read overlapping top-margin lines separately: a fax timestamp can overlap a smaller clinical header. Locate the printed labels Visit, ReportDate, DOI and DOB and transcribe each value with its own label. The value explicitly labeled Visit is encounter evidence; the fax timestamp is not. Read numeric month-day-year digits individually rather than completing an obscured date from nearby dates. Preserve a legible Visit date even when a different fax or report date appears above it. If the Visit value is unreadable, use [ILLEGIBLE] in its transcription and do not guess a service date. Preserve printed page labels and the original clinical heading on continuation pages.
+
 - transcription: the full text of the page in reading order. Keep headings, form labels with their values, dates, provider names and credentials, medication names, measurements. Write [REDACTED] for black redaction boxes and [ILLEGIBLE] for text you cannot read. Do not summarize. Do not invent text.
 - fax_header: the fax transmission header or stamp lines at the top or side edge of the page, verbatim, joined with " | ". null if none. Examples: "10/30/2025 3:17:27 PM PDT PAGE 2/005 Fax Server | Received by TPA ICS Fax 10/30/25", "Dec/29/2025 2:01:57 PM Kaiser 2/6".
 - fax_page: {{"k": page number, "n": total}} from the fax header, for example "PAGE 2/005" gives {{"k": 2, "n": 5}} and "2/6" gives {{"k": 2, "n": 6}}. null if none.

@@ -275,7 +275,11 @@ async def patch_record(record_id: str, patch: RecordPatch):
         raise HTTPException(404, "record not found")
     fields = _clean_patch(patch.model_dump(exclude_unset=True))
     if fields:
+        from .pipeline.dedupe import dedupe_all_async, pairing_changed
+        before = db.get_override(record_id)
         db.upsert_override(record_id, fields)
+        if pairing_changed(before, db.get_override(record_id)):
+            await dedupe_all_async()
     return _record_item(record_id)
 
 
@@ -283,5 +287,9 @@ async def patch_record(record_id: str, patch: RecordPatch):
 async def reset_record(record_id: str):
     if db.get_record(record_id) is None:
         raise HTTPException(404, "record not found")
+    from .pipeline.dedupe import dedupe_all_async, pairing_changed
+    before = db.get_override(record_id)
     db.delete_override(record_id)
+    if pairing_changed(before, None):
+        await dedupe_all_async()
     return _record_item(record_id)

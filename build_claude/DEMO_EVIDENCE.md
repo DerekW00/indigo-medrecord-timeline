@@ -43,3 +43,13 @@ At 22:06 UTC, source DB SHA256 was `4844ff9e1509939237108b913c0dc592776b1b78b498
 - Task2 `e9b104eceb3393a116835f64e263016b072a27cd`: source repair completed, but S exits 1 because dates are 30/31. Boundaries are 31/31 matched gold spans, 188/188 assigned pages, 35 predictions, zero false starts; types 31/31; date-rule violations 0 across 35 summaries. Exactly two authorized vision page units and seven summary units ran (all attempt 1). There is no authorization for more extraction or gold-derived substitution. This date gate remains a release failure. Data handoff is idle at `/Users/dw/indigo-source-fixes/build_claude/data/source188`. These are owner-reported results pending integrated verification.
 - Task3 F1 `9b9a4d9d58543f7ee3a8445e554cdf249f8281d2`: owner measured 1/2 duplicate pairs, zero false pairs, 29 focused tests. Its legacy near path remains WIP; final F2 checkpoint is required.
 - Task4 `26c5bd67dbcce7af9bd9468b8b1c5af0a3a043d4`: owner reports six passing U/recovery tests. Mac tunnel walkthrough is explicitly unverified. Requested an optional test scratch root so integrated tests remain within Task5's runtime scope.
+
+## P1: duplicate membership after reviewer edits
+
+Task3 reported that PATCH/Reset never called the existing duplicate recomputation wrapper. Task5 reproduced the consequence with a synthetic API regression: hiding a canonical record left the visible timeline empty although its other source remained stored (**1 failed, 1 passed before fix**). Under the authorized unowned-core P1 exception, Task5 registered `app/api.py` and new `tests/test_api_integration.py` in its extra-owned list. PATCH and Reset now await the existing wrapper only when date/type/hidden overrides change; prose-only changes avoid recomputation. No schema or endpoint changes.
+
+```bash
+MRT_DATA_DIR=/Users/dw/indigo-integration/build_claude/data/task5 MRT_FAKE_LLM=1 .venv/bin/python -m pytest -q --basetemp=/Users/dw/indigo-integration/build_claude/data/task5/pytest-api-fixed
+```
+
+Result after fix, before lane integration: **68 passed in 0.55s**; `git diff --check` passed. The external adversarial report was not yet present.

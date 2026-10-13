@@ -82,6 +82,24 @@ def test_full188_sources_filters_edit_restart_reset(browser):
                 assert response.content.startswith(b'\xff\xd8')
             page.locator('#filter-dups').check()
             wait_cards(page, len(all_items))
+            # Baseline has no groups. On Task3's repaired copy, verify every
+            # actual group, badge, member and source link without fixed counts.
+            canonical = [i for i in all_items if i['duplicate'] and i['duplicate']['is_canonical']]
+            expected_groups = os.environ.get('MRT_UI_EXPECT_DUPLICATE_GROUPS')
+            if expected_groups is not None:
+                assert len(canonical) == int(expected_groups)
+            for item in canonical:
+                duplicate = item['duplicate']
+                card = page.locator(f'.card[data-id="{item["id"]}"]')
+                assert card.locator('.copies').text_content() == f"{duplicate['copies']} copies"
+                assert len(duplicate['others']) == duplicate['copies'] - 1
+                for other in duplicate['others']:
+                    assert page.locator(f'.card[data-id="{other["id"]}"] .dupchip').count() == 1
+                    open_card(page, item['id'])
+                    index = duplicate['others'].index(other)
+                    page.locator('.dup-list button').nth(index).click()
+                    page.locator('.detail-head .dupchip').wait_for()
+                    assert page.locator('figure.page').count() == other['end_page'] - other['start_page'] + 1
             for number in (151, 154):
                 item = next(i for i in all_items if i['start_page'] <= number <= i['end_page'])
                 open_card(page, item['id'])
@@ -97,6 +115,9 @@ def test_full188_sources_filters_edit_restart_reset(browser):
                 popup.value.close()
             page.locator('#filter-dups').uncheck()
             wait_cards(page, len(visible))
+            for item in all_items:
+                if item['duplicate'] and not item['duplicate']['is_canonical']:
+                    assert page.locator(f'.card[data-id="{item["id"]}"]').count() == 0
             chosen = visible[0]
             page.locator('#filter-type').select_option(chosen['record_type'])
             wait_cards(page, sum(i['record_type'] == chosen['record_type'] for i in visible))
@@ -112,6 +133,14 @@ def test_full188_sources_filters_edit_restart_reset(browser):
             title.wait_for()
             marker = 'Synthetic reviewer edit for persistence rehearsal'
             title.fill(marker)
+            edits = {'title': marker, 'date_of_service': '2099-01-02',
+                     'provider': 'Synthetic reviewer provider',
+                     'summary': 'Synthetic summary edit for persistence rehearsal.'}
+            for name, value in edits.items():
+                page.locator(f'.edit-form [name="{name}"]').fill(value)
+            page.locator('.edit-form [name=record_type]').select_option('other')
+            edits['record_type'] = 'other'
+            title.focus()
             title.press('Escape')
             assert title.input_value() == marker
             polls = []
@@ -124,18 +153,21 @@ def test_full188_sources_filters_edit_restart_reset(browser):
             page.reload()
             wait_cards(page, len(visible))
             open_card(page, chosen['id'])
-            assert title.input_value() == marker
+            for name, value in edits.items():
+                assert page.locator(f'.edit-form [name="{name}"]').input_value() == value
             server.stop()
             server.start()
             page.reload()
             wait_cards(page, len(visible))
             open_card(page, chosen['id'])
-            assert title.input_value() == marker
+            for name, value in edits.items():
+                assert page.locator(f'.edit-form [name="{name}"]').input_value() == value
             page.once('dialog', lambda dialog: dialog.accept())
             page.get_by_role('button', name='Reset to model version', exact=True).click()
             eventually(lambda: not server.client.get(f"/api/records/{chosen['id']}").json()['edited'])
             page.wait_for_function("() => document.querySelector('.edit-form [name=reset]').disabled")
-            assert title.input_value() == (chosen['model']['title'] or '')
+            for name in edits:
+                assert page.locator(f'.edit-form [name="{name}"]').input_value() == (chosen['model'][name] or '')
             page.get_by_role('button', name='Close', exact=True).focus()
             page.keyboard.press('Escape')
             assert page.locator('.edit-form').count() == 0
@@ -181,7 +213,8 @@ def test_two_uploads_duplicates_and_polling_while_typing(browser):
 
 
 def test_browser_same_process_retry(browser):
-    with scratch('retry-browser-') as directory, Server(directory, MRT_FAIL_AT_PAGE='5') as server:
+    port = int(os.environ.get('MRT_TEST_RETRY_PORT', '0')) or None
+    with scratch('retry-browser-') as directory, Server(directory, port=port, MRT_FAIL_AT_PAGE='5') as server:
         page = browser.new_page()
         page.goto(server.url)
         page.locator('#file-input').set_input_files({

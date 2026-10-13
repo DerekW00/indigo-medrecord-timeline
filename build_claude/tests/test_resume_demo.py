@@ -51,7 +51,7 @@ main()
 
 @contextmanager
 def scratch(prefix):
-    parent = ROOT / "data" / "task4-tests"
+    parent = Path(os.environ.get("MRT_TEST_SCRATCH_ROOT", str(ROOT / "data" / "task4-tests"))).resolve()
     parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=prefix, dir=parent) as name:
         yield Path(name)
@@ -76,11 +76,11 @@ def synthetic_pdf(pages=12, label="Synthetic recovery fixture"):
 
 
 class Server:
-    def __init__(self, directory, **overrides):
+    def __init__(self, directory, port=None, **overrides):
         self.directory = directory
         directory.mkdir(parents=True, exist_ok=True)
         with socket.socket() as sock:
-            sock.bind(("127.0.0.1", 0))
+            sock.bind(("127.0.0.1", port or 0))
             self.port = sock.getsockname()[1]
         self.url = f"http://127.0.0.1:{self.port}"
         self.client = httpx.Client(base_url=self.url, timeout=15)

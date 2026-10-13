@@ -1,16 +1,19 @@
 # Eval: are the boundaries and summaries right?
 
-Two checks, both run from the project root with the venv Python.
+Run these commands from `build_claude` with its virtual environment. The adopted
+gold is repository-root `eval/gold/record_1.json`; the evaluator selects it by
+default. Historical drafts are archived under `docs/archive/`.
 
 ## 1. Make a gold file (once per sample PDF)
 
 ```
-python scripts/export_gold.py --doc-id <id or prefix>      # writes eval/gold/<stem>.json
+.venv/bin/python -m scripts.export_gold --doc-id <id or prefix>
 ```
 
 It dumps the current predicted spans in the gold shape (`id`, `start_page`, `end_page`,
 `date_of_service`, `record_type`, `accepted_types`, `note`). A human then looks at the page
-images and corrects the wrong spans. Optional per-record keys: `allow_internal_splits: true`
+images and corrects the wrong spans. This exports predictions for review; it does
+not replace the adopted root gold. Optional per-record keys: `allow_internal_splits: true`
 (a chart printout that may be split into its notes), `duplicate_of: "r25"` with
 `duplicate_kind: exact|near|partial`. `labeled_pages: [lo, hi]` limits scoring to the pages
 that were actually labeled. Reviewer edits made in the UI are applied before the export.
@@ -18,7 +21,7 @@ that were actually labeled. Reviewer edits made in the UI are applied before the
 ## 2. Score a document
 
 ```
-python eval/run_eval.py --doc-id <id or prefix> [--judge]  # writes eval/results/<doc-id>.json
+.venv/bin/python -m eval.run_eval --doc-id <id or prefix> [--judge]
 ```
 
 Metrics, computed inside `labeled_pages` only (spans are clipped to that window):

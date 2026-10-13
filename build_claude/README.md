@@ -17,6 +17,10 @@ cp env.example .env
 
 Open http://127.0.0.1:8000 and drop one or more PDFs. No Node build, system OCR packages, authentication, or cloud storage are required. PDFs, images, checkpoints, and edits stay in `MRT_DATA_DIR` (default `build_claude/data`). Page images and record text are sent to OpenAI for model processing.
 
+Standard Python setup also works: run `python3 -m venv .venv`, activate with
+`source .venv/bin/activate`, and install with `pip install -r requirements.txt`.
+Then copy `env.example` to `.env`, set the key, and run `python -m app`.
+
 Configuration is in [env.example](env.example). Concurrency defaults to **16**, matching the measured build; `MRT_MAX_PAGES=12` limits new development runs. `MRT_FAKE_LLM=1` produces synthetic output for offline checks. It is not used for the reported medical-record evaluation.
 
 ## How it works
@@ -31,7 +35,7 @@ Grouping starts at page 1 while allowing a partial beginning. Printed page conti
 
 Exact duplicate detection uses complete page-image containment or identical clinical text. Near candidates require the same known effective date and type and clinical word-set Jaccard similarity **at least 0.85**, followed by a validated model decision. A complete high-confidence duplicate decision or valid `uncertain` decision qualifies; `different`, `distinct`, and `complementary` decisions preserve both records. Failed or incomplete confirmations never activate the fallback. Each member is checked against the canonical record, without transitive merging. Valid decisions, including vetoes, are cached using the source text, effective date/type, model, and prompt. Unchanged inputs reuse the first saved decision across uploads and restarts; changed evidence is checked again.
 
-The longest record is canonical, with document order and page position breaking ties. The detail panel shows each copy's evidence and actual similarity score; the known near pair scores **88.1%**. Show duplicates reveals every source occurrence.
+The longest record is canonical, with document order and page position breaking ties. The detail panel shows each copy's evidence and actual similarity score; the known near pair scores **88.1%**. Click a copies badge to reveal and focus a copy, or enable Show duplicates to reveal every source occurrence. Timeline cards show three lines of summary; the detail editor keeps the full text. Dates display in calendar order without shifting for the browser's time zone.
 
 One background worker processes documents in order; calls within a document run concurrently. SQLite uses WAL and short transactions. Vision is needed because the sample has no text layer. Separating extraction from grouping and summarization permits cached replay. Deterministic IDs derived from document bytes and page spans preserve reviewer edits across retries when boundaries stay the same.
 

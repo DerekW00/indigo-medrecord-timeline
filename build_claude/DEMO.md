@@ -2,6 +2,11 @@
 
 Freeze is **16:20 PT**. The demo runs from a clean `uv` checkout at `/Users/dw/indigo-demo`, through Mac SSH forwarding to VPS loopback port 8000. The retry server uses port 8006 and a separate synthetic store. No command below re-extracts the full sample.
 
+The live store also contains the completed `record_1_shuffled.pdf` (72 pages) and
+`record_1_tail.pdf` (40 pages) uploaded during rehearsal. Their records and reviewer
+edits are preserved. The published evaluation below uses the isolated original
+188-page sample, not this expanded rehearsal store.
+
 ## 1. Start and connect
 
 The prepared servers use tmux windows `final:demo` and `final:retry`. If the main server is stopped, run on the VPS in `final:demo`:

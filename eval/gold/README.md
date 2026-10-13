@@ -13,9 +13,9 @@ working directory. From `build_claude`, run:
 .venv/bin/python -m eval.run_eval --filename record_1.pdf
 ```
 
-The Claude drafts in this directory and the old snapshots under
-`build_claude/eval/gold/` are historical comparison evidence, not adopted labels.
-They remain referenced by the build and review notes and are never selected by the
-default evaluator. Use `--gold` explicitly when evaluating a separate draft.
+The Claude drafts and old application-local snapshots are preserved under
+[`docs/archive/`](../../docs/archive/README.md) at their original relative paths.
+They are historical comparison evidence and are never selected by the default
+evaluator. Use `--gold` explicitly when evaluating a separate draft.
 `scripts/export_gold.py` exports predictions for review; its output does not replace
 this adopted file or become canonical automatically.

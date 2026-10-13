@@ -104,5 +104,27 @@
     "35 predictions cover 31 gold records using four allowed internal starts.",
     "Judge evaluates capped transcriptions, not original page images.",
     "Judge labels vary between runs; this artifact reports the fresh final run."
-  ]
+  ],
+  "release_verification": {
+    "application_commit": "47750cce177c986c1bdf16aa3597f8596e4186cb",
+    "tests_passed": 197,
+    "test_duration_seconds": 33.34,
+    "clean_checkout_smoke": "PASS using fresh uv environment",
+    "cached_grouping_replay_pages": 188,
+    "cached_grouping_replay_spans": 35,
+    "baseline_and_gold_unchanged": true,
+    "persistent_confirmation_cache": "Original validated decision persisted; no model calls on identical evidence",
+    "mac_tunnel": "operator confirmation pending",
+    "two_pdf_browser": {
+      "result": "PASS",
+      "records": 43,
+      "visible_cards": 33,
+      "duplicate_groups": 10,
+      "cross_bundle_copies": 8,
+      "date_order": true,
+      "edit_restart_reset": true,
+      "cached_score_visible": "88.1%",
+      "final_validation_model_calls": 0
+    }
+  }
 }

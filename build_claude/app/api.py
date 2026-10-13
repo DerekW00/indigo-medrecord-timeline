@@ -141,7 +141,8 @@ def _loads(raw, default):
         return default
 
 
-def _item(rec: dict, ov: dict | None, dup: dict | None, members: dict, by_id: dict) -> dict:
+def _item(rec: dict, ov: dict | None, dup: dict | None, members: dict, by_id: dict,
+          duplicate_rows: dict) -> dict:
     model = {k: rec.get(k) for k in OVERRIDE_FIELDS}
     effective = dict(model)
     edited = False
@@ -171,7 +172,10 @@ def _item(rec: dict, ov: dict | None, dup: dict | None, members: dict, by_id: di
     if dup:
         ids = members.get(dup["group_id"], [])
         others = [
-            {"id": o["id"], "filename": o.get("filename"), "start_page": o["start_page"], "end_page": o["end_page"]}
+            {"id": o["id"], "filename": o.get("filename"), "start_page": o["start_page"],
+             "end_page": o["end_page"], "reason": duplicate_rows[o["id"]].get("reason"),
+             "score": duplicate_rows[o["id"]].get("score"),
+             "is_canonical": bool(duplicate_rows[o["id"]]["is_canonical"])}
             for o in (by_id.get(rid) for rid in ids if rid != rec["id"]) if o
         ]
         item["duplicate"] = {
@@ -193,7 +197,7 @@ def build_items(records: list[dict] | None = None) -> list[dict]:
     members: dict[str, list[str]] = {}
     for rid, d in dups.items():
         members.setdefault(d["group_id"], []).append(rid)
-    return [_item(r, overrides.get(r["id"]), dups.get(r["id"]), members, by_id) for r in records]
+    return [_item(r, overrides.get(r["id"]), dups.get(r["id"]), members, by_id, dups) for r in records]
 
 
 def sort_items(items: list[dict], desc: bool = False) -> list[dict]:

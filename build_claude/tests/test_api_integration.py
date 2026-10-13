@@ -92,3 +92,38 @@ async def test_date_or_type_edit_separates_near_copy_and_reset_rejoins(duplicate
         reset = await client.delete(f"/api/records/{copy}/overrides")
         assert reset.status_code == 200 and reset.json()["duplicate"]["group_id"] == canonical
         assert [r["id"] for r in (await client.get("/api/timeline")).json()] == [canonical]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason,score", [("similar", 0.880531), ("similar_confirmed", 0.91),
+                                         ("partial_exact", 1.0), ("exact_image", 1.0), ("exact", 1.0)])
+async def test_duplicate_sources_expose_member_evidence_not_canonical_score(
+        duplicate_store, monkeypatch, reason, score):
+    canonical, copy = duplicate_store
+    db.replace_duplicate_groups([
+        {"record_id": canonical, "group_id": canonical, "is_canonical": True,
+         "reason": reason, "score": 1.0},
+        {"record_id": copy, "group_id": canonical, "is_canonical": False,
+         "reason": reason, "score": score},
+    ])
+    get_groups = db.get_duplicate_groups
+    calls = []
+
+    def counted_groups():
+        calls.append(True)
+        return get_groups()
+
+    monkeypatch.setattr(db, "get_duplicate_groups", counted_groups)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=api.app), base_url="http://test") as client:
+        timeline = (await client.get("/api/timeline")).json()
+        duplicate = timeline[0]["duplicate"]
+        assert duplicate["score"] == 1.0
+        member = duplicate["others"][0]
+        assert member["id"] == copy and member["reason"] == reason and member["score"] == score
+        assert not member["is_canonical"]
+        assert len(calls) == 1
+
+        detail = (await client.get(f"/api/records/{copy}")).json()["duplicate"]
+        assert detail["reason"] == reason and detail["score"] == score
+        assert detail["others"][0]["id"] == canonical and detail["others"][0]["is_canonical"]
+        assert len(calls) == 2

@@ -399,6 +399,22 @@ function typeSelect(current) {
   return select;
 }
 
+function duplicateMatchText(duplicate) {
+  if (duplicate.is_canonical) return 'Shown on the timeline';
+  const labels = {
+    similar: 'Near duplicate (model uncertain)',
+    similar_confirmed: 'Near duplicate (model confirmed)',
+    partial_exact: 'Exact partial copy',
+    exact_image: 'Exact page-image copy',
+    exact: 'Exact text copy',
+  };
+  const label = labels[duplicate.reason] || 'Duplicate copy';
+  const near = duplicate.reason === 'similar' || duplicate.reason === 'similar_confirmed';
+  return near && Number.isFinite(duplicate.score)
+    ? `${label} · ${(duplicate.score * 100).toFixed(1)}% word-set similarity to the timeline copy`
+    : label;
+}
+
 function renderDetail(rec) {
   const root = $('#detail');
   clear(root);
@@ -460,8 +476,10 @@ function renderDetail(rec) {
       h('p', {}, dup.is_canonical
         ? `${dup.copies} copies of this record were found; this one is shown on the timeline.`
         : 'This record is a copy of another record. It is hidden from the timeline unless "Show duplicates" is on.'),
+      !dup.is_canonical ? h('p', {}, duplicateMatchText(dup)) : null,
       others.length ? h('ul', { class: 'dup-list' }, others.map((o) =>
-        h('li', {}, h('button', { type: 'button', class: 'link', onclick: () => selectRecord(o.id) }, sourceText(o))))) : null,
+        h('li', {}, h('button', { type: 'button', class: 'link', onclick: () => selectRecord(o.id) }, sourceText(o)),
+          h('span', { class: 'muted' }, ` — ${duplicateMatchText(o)}`)))) : null,
     ));
   }
 

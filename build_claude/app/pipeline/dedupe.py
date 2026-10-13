@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
+import os
 import re
+import tempfile
 import threading
 from collections import Counter
 from datetime import datetime
@@ -19,7 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .. import config, db, llm
-from .prompts_util import load_prompt
+from .prompts_util import PROMPTS_DIR, load_prompt
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +33,7 @@ MIN_WORDS = 8          # shorter normalized texts (blank or failed pages) never 
 PAIRING_FIELDS = ("date_of_service", "record_type", "hidden")   # override fields that drive the pairing
 
 _recompute_lock = threading.Lock()   # worker and API may both recompute; the later caller reads newer state
+_confirmation_cache_lock = threading.Lock()
 
 _DATE_RE = re.compile(
     r"\b(?:\d{1,2}/\d{1,2}/\d{2,4}|[a-z]{3}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2}"
@@ -303,17 +307,92 @@ def _load_items() -> list[dict]:
     return sorted(items, key=_canonical_key)
 
 
+def confirmation_cache_key(a: dict, b: dict) -> str:
+    """Fingerprint the complete ordered evidence and exact prompt; performs file I/O."""
+    fields = ("id", "doc_id", "start_page", "end_page", "text", "transcription",
+              "text_complete", "date_of_service", "record_type")
+    payload = {
+        "version": 1, "model": config.OPENAI_MODEL,
+        "prompt": (PROMPTS_DIR / "duplicate_confirm.md").read_text(encoding="utf-8"),
+        "a": {field: a.get(field) for field in fields},
+        "b": {field: b.get(field) for field in fields},
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def _read_cached_confirmation(key: str) -> DuplicateConfirmation | None:
+    if config.FAKE_LLM:
+        return None
+    try:
+        payload = json.loads((config.DATA_DIR / "duplicate_confirmations" / f"{key}.json").read_text())
+        if not isinstance(payload, dict) or payload.get("key") != key:
+            return None
+        return DuplicateConfirmation.model_validate(payload.get("decision"), strict=True)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return None
+
+
+def save_cached_confirmation(a: dict, b: dict, decision, *, _key: str | None = None
+                             ) -> DuplicateConfirmation | None:
+    """Atomically retain the first valid decision. Call off the event loop.
+
+    This also permits explicit provenance-backed seeding of an isolated store.
+    Fake mode never reads or writes the cache.
+    """
+    if config.FAKE_LLM:
+        return None
+    decision = DuplicateConfirmation.model_validate(
+        decision.model_dump() if isinstance(decision, DuplicateConfirmation) else decision, strict=True)
+    key = _key or confirmation_cache_key(a, b)
+    with _confirmation_cache_lock:
+        existing = _read_cached_confirmation(key)
+        if existing is not None:
+            return existing
+        directory = config.DATA_DIR / "duplicate_confirmations"
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / f"{key}.json"
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory,
+                                             prefix=".confirmation-", delete=False) as stream:
+                temp_path = Path(stream.name)
+                json.dump({"key": key, "decision": decision.model_dump()}, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            # Hard linking publishes a complete entry without replacing a first writer.
+            try:
+                os.link(temp_path, target)
+            except FileExistsError:
+                existing = _read_cached_confirmation(key)
+                if existing is not None:
+                    return existing
+                os.replace(temp_path, target)  # Replace a corrupt entry only.
+            return decision
+        finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+
+
 async def confirm_pair(a: dict, b: dict) -> DuplicateConfirmation | None:
     if config.FAKE_LLM:
         return None  # A skipped call is not a valid uncertain model response.
     if config.OPENAI_MODEL != "gpt-6-luna":
         raise ValueError("duplicate confirmation requires gpt-6-luna")
-    system, template = load_prompt("duplicate_confirm")
+    key = await asyncio.to_thread(confirmation_cache_key, a, b)
+    cached = await asyncio.to_thread(_read_cached_confirmation, key)
+    if cached is not None:
+        return cached
+    # Read current contents instead of the general loader's process-local memoization.
+    loader = getattr(load_prompt, "__wrapped__", load_prompt)
+    system, template = await asyncio.to_thread(loader, "duplicate_confirm")
     user = template.format(a_start=a["start_page"], a_end=a["end_page"],
                            b_start=b["start_page"], b_end=b["end_page"],
                            a_text=a["transcription"], b_text=b["transcription"])
-    return await llm.text_json(system, user, DuplicateConfirmation,
-                               f"dedupe {a['id']} {b['id']}")
+    decision = await llm.text_json(system, user, DuplicateConfirmation,
+                                  f"dedupe {a['id']} {b['id']}")
+    if decision is None:
+        return None
+    return await asyncio.to_thread(save_cached_confirmation, a, b, decision, _key=key)
 
 
 async def dedupe_all(*, exact_only: bool = False, max_confirmations: int = 8,

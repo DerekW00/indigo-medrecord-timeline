@@ -150,12 +150,13 @@ def test_async_production_path_is_conservative_and_keeps_work_off_loop(monkeypat
     assert len(evidence) == 1
 
 
-def test_real_confirmation_uses_existing_adapter_and_full_page_markers(monkeypatch):
+def test_real_confirmation_uses_existing_adapter_and_full_page_markers(monkeypatch, tmp_path):
     a, b = near_pair()
     for r in (a, b):
         r["transcription"] = "=== Page 1 ===\n" + r["text"]
     monkeypatch.setattr(config, "FAKE_LLM", False)
     monkeypatch.setattr(config, "OPENAI_MODEL", "gpt-6-luna")
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     calls = []
 
     async def text_json(system, user, model, tag):
@@ -279,3 +280,127 @@ def test_production_fallback_requires_valid_uncertain_response(monkeypatch, outc
     assert evidence[0]['accepted'] == (outcome == 'uncertain')
     if published:
         assert all(row['reason'] == 'similar' for row in published)
+
+
+def cache_pair(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "FAKE_LLM", False)
+    monkeypatch.setattr(config, "OPENAI_MODEL", "gpt-6-luna")
+    a, b = near_pair()
+    for item in (a, b):
+        item.update(text_complete=True, transcription=item["text"])
+    return a, b
+
+
+def test_confirmation_cache_survives_module_reload_and_preserves_first_decision(monkeypatch, tmp_path):
+    import importlib
+    a, b = cache_pair(monkeypatch, tmp_path)
+    caller = threading.get_ident()
+    calls = []
+    original_key = dedupe.confirmation_cache_key
+    original_save = dedupe.save_cached_confirmation
+    def key(*args):
+        assert threading.get_ident() != caller
+        return original_key(*args)
+    def save(*args, **kwargs):
+        assert threading.get_ident() != caller
+        return original_save(*args, **kwargs)
+    async def model(*_):
+        calls.append(True)
+        return decision(a, b, relation="uncertain", confidence="medium")
+    monkeypatch.setattr(dedupe, "confirmation_cache_key", key)
+    monkeypatch.setattr(dedupe, "save_cached_confirmation", save)
+    monkeypatch.setattr(dedupe.llm, "text_json", model)
+    assert asyncio.run(dedupe.confirm_pair(a, b)).relation == "uncertain"
+    importlib.reload(dedupe)
+    assert asyncio.run(dedupe.confirm_pair(a, b)).relation == "uncertain"
+    assert len(calls) == 1
+    kept = dedupe.save_cached_confirmation(a, b, decision(a, b, relation="different"))
+    assert kept.relation == "uncertain"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("id", "changed"), ("doc_id", "changed"), ("start_page", 2), ("end_page", 2),
+    ("text", "changed"), ("transcription", "changed"), ("text_complete", False),
+    ("date_of_service", "2025-02-02"), ("record_type", "physical_therapy"),
+])
+@pytest.mark.parametrize("side", [0, 1])
+def test_confirmation_cache_key_includes_both_complete_evidence_records(monkeypatch, tmp_path, field, value, side):
+    a, b = cache_pair(monkeypatch, tmp_path)
+    key = dedupe.confirmation_cache_key(a, b)
+    (a, b)[side][field] = value
+    assert dedupe.confirmation_cache_key(a, b) != key
+
+
+def test_confirmation_cache_key_includes_model_and_exact_prompt(monkeypatch, tmp_path):
+    a, b = cache_pair(monkeypatch, tmp_path)
+    original_prompt = (dedupe.PROMPTS_DIR / "duplicate_confirm.md").read_text()
+    prompt = tmp_path / "duplicate_confirm.md"
+    prompt.write_text(original_prompt)
+    monkeypatch.setattr(dedupe, "PROMPTS_DIR", tmp_path)
+    key = dedupe.confirmation_cache_key(a, b)
+    monkeypatch.setattr(config, "OPENAI_MODEL", "changed-model")
+    assert dedupe.confirmation_cache_key(a, b) != key
+    monkeypatch.setattr(config, "OPENAI_MODEL", "gpt-6-luna")
+    prompt.write_text(original_prompt + "\n")
+    assert dedupe.confirmation_cache_key(a, b) != key
+
+
+@pytest.mark.parametrize("relation", ["different", "distinct", "complementary"])
+def test_cached_veto_is_reused_and_never_collapses(monkeypatch, tmp_path, relation):
+    a, b = cache_pair(monkeypatch, tmp_path)
+    dedupe.save_cached_confirmation(a, b, decision(a, b, relation=relation))
+    async def forbidden(*_):
+        pytest.fail("cached decision must not call model")
+    monkeypatch.setattr(dedupe.llm, "text_json", forbidden)
+    cached = asyncio.run(dedupe.confirm_pair(a, b))
+    assert cached.relation == relation
+    assert dedupe.confirmation_reason(cached, a, b) is None
+
+
+def test_fake_mode_bypasses_valid_cache_and_writes(monkeypatch, tmp_path):
+    a, b = cache_pair(monkeypatch, tmp_path)
+    dedupe.save_cached_confirmation(a, b, decision(a, b, relation="uncertain"))
+    monkeypatch.setattr(config, "FAKE_LLM", True)
+    async def forbidden(*_):
+        pytest.fail("fake mode must not call model")
+    monkeypatch.setattr(dedupe.llm, "text_json", forbidden)
+    assert asyncio.run(dedupe.confirm_pair(a, b)) is None
+    a["text"] = "changed"
+    assert dedupe.save_cached_confirmation(a, b, decision(a, b)) is None
+    assert len(list((tmp_path / "duplicate_confirmations").glob("*.json"))) == 1
+
+
+@pytest.mark.parametrize("response", [None, {}, {"relation": "uncertain"}, "error"])
+def test_failed_or_invalid_confirmation_is_never_cached(monkeypatch, tmp_path, response):
+    a, b = cache_pair(monkeypatch, tmp_path)
+    async def model(*_):
+        if response == "error":
+            raise RuntimeError("synthetic failure")
+        return response
+    monkeypatch.setattr(dedupe.llm, "text_json", model)
+    if response is None:
+        assert asyncio.run(dedupe.confirm_pair(a, b)) is None
+    else:
+        with pytest.raises((ValueError, RuntimeError)):
+            asyncio.run(dedupe.confirm_pair(a, b))
+    assert not list(tmp_path.rglob("*.json"))
+
+
+@pytest.mark.parametrize("corruption", ["not json", "{}", '{"key": "wrong", "decision": {}}'])
+def test_corrupt_confirmation_cache_is_miss_and_replaced_with_valid_response(monkeypatch, tmp_path, corruption):
+    a, b = cache_pair(monkeypatch, tmp_path)
+    key = dedupe.confirmation_cache_key(a, b)
+    path = tmp_path / "duplicate_confirmations" / f"{key}.json"
+    path.parent.mkdir()
+    path.write_text(corruption)
+    calls = []
+    async def model(*_):
+        calls.append(True)
+        return decision(a, b, relation="different")
+    monkeypatch.setattr(dedupe.llm, "text_json", model)
+    for _ in range(2):
+        result = asyncio.run(dedupe.confirm_pair(a, b))
+        assert result.relation == "different"
+        assert dedupe.confirmation_reason(result, a, b) is None
+    assert len(calls) == 1

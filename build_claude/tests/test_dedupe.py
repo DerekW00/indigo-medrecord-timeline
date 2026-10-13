@@ -1,6 +1,7 @@
 """Unit tests for app.pipeline.dedupe (spec section 8)."""
 from __future__ import annotations
 
+import asyncio
 import pytest
 
 from app import config, db
@@ -58,6 +59,21 @@ def with_typos(text: str, replacements: dict[str, str]) -> str:
     return text
 
 
+def decision(a, b):
+    return dedupe.DuplicateConfirmation(relation="duplicate", confidence="high", reason="synthetic copy",
+        a_pages=list(range(a["start_page"], a["end_page"] + 1)),
+        b_pages=list(range(b["start_page"], b["end_page"] + 1)), unique_content="")
+
+
+async def approve(a, b):
+    return decision(a, b)
+
+
+def confirmed(records):
+    return find_duplicates(records, confirmations={(a["id"], b["id"]): decision(a, b)
+                                                   for a in records for b in records if a != b})
+
+
 # ---------- normalization ----------
 
 def test_normalize_drops_fax_header_lines_and_stamp():
@@ -107,12 +123,12 @@ def test_identical_text_with_different_fax_headers_is_exact():
 def test_text_with_a_few_transcription_differences_is_near():
     noisy = with_typos(PR2, {"swelling": "sweling", "antalgic": "antalgie", "walking boot": "walking bo0t",
                              "radiographs": "radiograhps"})
-    rows = find_duplicates([rec("r1", FAX_A + PR2), rec("r2", FAX_B + noisy, doc="docB")])
+    rows = confirmed([rec("r1", FAX_A + PR2), rec("r2", FAX_B + noisy, doc="docB")])
     by_id = {r["record_id"]: r for r in rows}
     assert set(by_id) == {"r1", "r2"}
-    assert by_id["r2"]["reason"] == "similar" and by_id["r2"]["group_id"] == "r1"
+    assert by_id["r2"]["reason"] == "similar_confirmed" and by_id["r2"]["group_id"] == "r1"
     assert dedupe.NEAR_THRESHOLD <= by_id["r2"]["score"] < 1.0
-    assert by_id["r1"] == {"record_id": "r1", "group_id": "r1", "is_canonical": 1, "reason": "similar", "score": 1.0}
+    assert by_id["r1"] == {"record_id": "r1", "group_id": "r1", "is_canonical": 1, "reason": "similar_confirmed", "score": 1.0}
 
 
 def test_different_records_with_same_date_and_type_are_not_duplicates():
@@ -121,14 +137,14 @@ def test_different_records_with_same_date_and_type_are_not_duplicates():
     assert jaccard(shingles(normalize_text(PR2)), shingles(normalize_text(OTHER_PR2))) < 0.3
 
 
-def test_near_candidates_need_same_type_and_compatible_dates():
+def test_near_candidates_need_same_type_and_known_equal_dates():
     noisy = with_typos(PR2, {"swelling": "sweling", "antalgic": "antalgie"})
     # different dates: never candidates, even with nearly identical text
     assert find_duplicates([rec("r1", PR2, date="2025-10-30"), rec("r2", noisy, date="2025-11-13")]) == []
-    # one null date: candidates
-    assert len(find_duplicates([rec("r1", PR2, date="2025-10-30"), rec("r2", noisy, date=None)])) == 2
+    # unknown date: never candidates
+    assert confirmed([rec("r1", PR2, date="2025-10-30"), rec("r2", noisy, date=None)]) == []
     # a user-edited date in M/D/YYYY form compares as the same day
-    assert len(find_duplicates([rec("r1", PR2, date="2025-10-30"), rec("r2", noisy, date="10/30/2025")])) == 2
+    assert len(confirmed([rec("r1", PR2, date="2025-10-30"), rec("r2", noisy, date="10/30/2025")])) == 2
     # different types: never near candidates ...
     assert find_duplicates([rec("r1", PR2), rec("r2", noisy, rtype="office_visit")]) == []
     # ... but identical text is exact regardless of type
@@ -163,19 +179,16 @@ def test_blank_or_tiny_records_never_pair():
     assert find_duplicates([rec("r1", FAX_A), rec("r2", FAX_B, doc="docB")]) == []
 
 
-def test_near_pairs_chain_into_one_group():
-    b = with_typos(PR2, {"swelling": "sweling", "antalgic": "antalgie", "walking boot": "walking bo0t",
-                         "radiographs": "radiograhps", "returns": "retums", "Dorsiflexion": "Dorsiflexon"})
-    c = with_typos(b, {"improving": "improvng", "incisions": "incisons", "assistive": "asistive",
-                       "healing": "healng", "seated": "seatd", "Continue": "Contnue"})
-    sa, sb, sc = (shingles(normalize_text(t)) for t in (PR2, b, c))
-    # premise: a~b and b~c clear the bar, a~c alone does not (measured 0.79 / 0.79 / 0.63)
-    assert jaccard(sa, sb) >= 0.7 and jaccard(sb, sc) >= 0.7 and jaccard(sa, sc) < 0.7
-    rows = find_duplicates([rec("a", PR2), rec("b", b, doc="docB", created="2026-01-02T00:00:00+00:00"),
-                            rec("c", c, doc="docC", created="2026-01-03T00:00:00+00:00")])
-    assert {r["record_id"] for r in rows} == {"a", "b", "c"}
+def test_near_pairs_do_not_chain_into_one_group():
+    a = rec("a", " ".join(f"token{n}" for n in range(100)))
+    b = rec("b", " ".join(f"token{n}" for n in range(10, 110)))
+    c = rec("c", " ".join(f"token{n}" for n in range(20, 120)))
+    assert dedupe.candidate_score(a, b) >= 0.8
+    assert dedupe.candidate_score(b, c) >= 0.8
+    assert dedupe.candidate_score(a, c) < 0.8
+    rows = confirmed([a, b, c])
+    assert {r["record_id"] for r in rows} == {"a", "b"}
     assert {r["group_id"] for r in rows} == {"a"}
-    assert all(r["reason"] == "similar" for r in rows)
 
 
 def test_rows_are_sorted_and_input_duplicates_ignored():
@@ -227,7 +240,8 @@ def split_pages(text: str) -> list[str]:
     return ["\n".join(lines[:half]), "\n".join(lines[half:])]
 
 
-def test_dedupe_all_uses_page_text_overrides_and_hidden(temp_db):
+def test_dedupe_all_uses_page_text_overrides_and_hidden(temp_db, monkeypatch):
+    monkeypatch.setattr(dedupe, "confirm_pair", approve)
     noisy_other = with_typos(OTHER_PR2, {"clicking": "clickng", "tuberosity": "tuberosty", "Ibuprofen": "Ibuprofn"})
     r1, r3 = seed_document("docA", "2026-01-01T00:00:00+00:00", [
         (1, 2, split_pages(FAX_A + PR2 + STAMP), {}),
@@ -239,7 +253,7 @@ def test_dedupe_all_uses_page_text_overrides_and_hidden(temp_db):
     ])
     db.upsert_override(r4, {"hidden": 1})
 
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     groups = db.get_duplicate_groups()
     assert set(groups) == {r1, r2}, "hidden r4 and its partner r3 must stay out"
     assert groups[r1]["is_canonical"] == 1 and groups[r1]["reason"] == "exact"
@@ -247,20 +261,20 @@ def test_dedupe_all_uses_page_text_overrides_and_hidden(temp_db):
 
     # unhide r4 but give it an edited date: the effective date differs, so r3 and r4 are not candidates
     db.upsert_override(r4, {"hidden": 0, "date_of_service": "2024-01-01"})
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     assert set(db.get_duplicate_groups()) == {r1, r2}
 
     # reset the edit: r3 and r4 pair as similar, canonical in the earlier document
     db.delete_override(r4)
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     groups = db.get_duplicate_groups()
     assert set(groups) == {r1, r2, r3, r4}
     assert groups[r3]["is_canonical"] == 1 and groups[r4]["group_id"] == r3
-    assert groups[r4]["reason"] == "similar" and 0.7 <= groups[r4]["score"] < 1.0
+    assert groups[r4]["reason"] == "similar_confirmed" and 0.7 <= groups[r4]["score"] < 1.0
 
     # an edited type on one side breaks the near candidacy (exact pairs are unaffected)
     db.upsert_override(r4, {"record_type": "consultation"})
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     assert set(db.get_duplicate_groups()) == {r1, r2}
 
 
@@ -282,7 +296,7 @@ def test_dedupe_all_repairs_group_whose_canonical_was_regrouped(temp_db):
     pages = split_pages(FAX_A + PR2 + STAMP)
     a1, = seed_document("docA", "2026-01-01T00:00:00+00:00", [(1, 2, pages, {})])
     b1, = seed_document("docB", "2026-01-02T00:00:00+00:00", [(1, 2, split_pages(FAX_B + PR2), {})])
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     groups = db.get_duplicate_groups()
     assert groups[a1]["is_canonical"] == 1 and groups[b1]["group_id"] == a1
     assert visible_ids() == [a1]
@@ -297,7 +311,7 @@ def test_dedupe_all_repairs_group_whose_canonical_was_regrouped(temp_db):
     assert visible_ids() == [], "the stale state hides the only surviving copy (the defect)"
 
     # the repair: the rebuild ignores pending records, so b1 is ungrouped and visible again
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     assert db.get_duplicate_groups() == {}
     assert visible_ids() == [b1]
 
@@ -306,7 +320,7 @@ def test_dedupe_all_repairs_group_whose_canonical_was_regrouped(temp_db):
         db.save_record_summary(record_id_for("docA", start, start), {
             "record_type": "progress_report", "title": "PR-2", "date_of_service": "2025-10-30",
             "date_confidence": "exact", "summary": "s", "key_findings": [], "flags": []}, "h")
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     assert db.get_duplicate_groups() == {}, "1-page halves are not duplicates of the 2-page record"
 
 
@@ -315,7 +329,7 @@ def test_dedupe_all_after_hiding_canonical_promotes_the_other_copy(temp_db):
     vanished until an unrelated document finished. A rebuild after the override write fixes it."""
     a1, = seed_document("docA", "2026-01-01T00:00:00+00:00", [(1, 2, split_pages(FAX_A + PR2), {})])
     b1, = seed_document("docB", "2026-01-02T00:00:00+00:00", [(1, 2, split_pages(FAX_B + PR2), {})])
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     assert visible_ids() == [a1]
 
     before = db.get_override(a1)
@@ -323,14 +337,14 @@ def test_dedupe_all_after_hiding_canonical_promotes_the_other_copy(temp_db):
     assert visible_ids() == [], "stale groups: the hidden canonical takes its copy down with it"
     assert dedupe.pairing_changed(before, db.get_override(a1))
 
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     assert db.get_duplicate_groups() == {}     # a group of one is no group
     assert visible_ids() == [b1]
 
     before = db.get_override(a1)
     db.delete_override(a1)                     # reset to the model version
     assert dedupe.pairing_changed(before, None)
-    dedupe.dedupe_all()
+    asyncio.run(dedupe.dedupe_all())
     groups = db.get_duplicate_groups()
     assert groups[a1]["is_canonical"] == 1 and groups[b1]["group_id"] == a1
     assert visible_ids() == [a1]

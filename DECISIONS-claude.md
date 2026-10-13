@@ -23,5 +23,22 @@ Tesseract output on these fax scans is unusable (logo noise, dropped headers). `
 ## D2 — Three checkpointed stages, every unit persisted
 `pages` (render → vision OCR → transcript + signals) → `segment` (one LLM call over compact per-page signals → record boundaries) → `summarize` (per record). Each page / segmentation / record row is written to SQLite as soon as it exists. **Consequence:** bonus "Retry resumes from most recent progress" is a property of the design, not a feature to build.
 
-## D3 — Stack
-_Pending judge panel. Leading option: all-TypeScript (Node 22, Hono API, Vite + React UI, `mupdf` WASM, `node:sqlite`, `openai` SDK). Single `pnpm install && pnpm dev`. Derek presents TypeScript natively._
+## D3 — Stack: CLAUDE.md baseline (Python FastAPI + PyMuPDF + SQLite + vanilla JS)
+Derek's context pack (`CLAUDE.md`, 13:34 PT) fixes the stack. Claude proved the all-TypeScript alternative viable (`mupdf` WASM renders byte-identical PNGs in 259 ms; `node:sqlite` works) but switching costs time and the pack's prompts, lanes and README outline all assume Python. **Not recommended to switch.**
+
+## D4 — Fax identity is computed in code from the verbatim header, never from a model-normalized field
+Full-pass evidence: the model wrote `10/30/2025 3:17:27 PM`, `2025-10-30 3:17:27 PM` and `2025-10-30T15:17:27-07` for pages of one fax. Naive equality produced 78 spans for a 31-record bundle (pages 37–41 alone carried four spellings of one timestamp). Canonicalize to digits; fall back to `fax_page.n` equal and `k == prev.k + 1`.
+
+## D5 — Near-duplicates are advisory; exact duplicates may collapse
+Known near-dup (153–154 vs 155–156) scores 0.64 naive Jaccard; distinct PR-2 pages score up to 0.74 on boilerplate. A fixed 0.7 threshold both misses and over-matches. Exact `content_hash` match collapses with a `2 copies` badge; `similar` is a badge plus a list, and requires equal service dates (DESIGN_REVIEW R5).
+
+## D6 — Concurrency 16, full runs are cheap
+188 pages in 85 s at 24 parallel, no 429s; 744K tokens per bundle. Run the full bundle after every pipeline change instead of "at most twice".
+
+## D7 — Whole-record summarization, hard cap with a visible flag
+Longest record is 110K chars (~27K tokens), within one call. Cap at 400K chars and flag `summary incomplete`; never drop the middle silently (DESIGN_REVIEW R3).
+
+## D8 — Product-intent answers (Derek, 14:02 PT)
+1. **Fax cover sheets are suppressed.** They attach to the record that follows (CLAUDE.md §7 post-processing) and never produce a timeline card; the detail panel still shows the page.
+2. **Duplicate copies are indicated, not hidden.** Every copy stays on the timeline with a `duplicate of <record>` badge and a link to the canonical card; a `Collapse duplicates` toggle (off by default) hides non-canonical copies. Replaces CLAUDE.md §8 "canonical card + Show duplicates toggle".
+3. **One patient per bundle is guaranteed.** Multi-patient banner dropped from the stretch list; `patient_name` stays in `PageSignals` for the eval only.

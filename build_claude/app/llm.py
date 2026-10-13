@@ -30,7 +30,7 @@ T = TypeVar("T", bound=BaseModel)
 ATTEMPTS = 3
 BACKOFF = (2, 4, 8)
 _client = None
-_mode = {"schema": "json_schema", "api": "chat"}  # mutated on fallback, process-wide
+_mode = {"schema": "json_schema", "api": "chat", "effort_ok": True}  # mutated on fallback, process-wide
 
 
 class LLMError(Exception):
@@ -69,13 +69,15 @@ def _is_retryable(exc: Exception) -> bool:
 
 
 async def _call_chat(system: str, user_parts: list[dict], model_cls: type[BaseModel],
-                     max_completion_tokens: int):
+                     max_completion_tokens: int, effort: str):
     client = _get_client()
+    extra = {"reasoning_effort": effort} if effort and _mode["effort_ok"] else {}
     resp = await client.chat.completions.create(
         model=config.OPENAI_MODEL,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user_parts}],
         response_format=_response_format(model_cls),
         max_completion_tokens=max_completion_tokens,
+        **extra,
     )
     choice = resp.choices[0]
     usage = resp.usage
@@ -83,8 +85,9 @@ async def _call_chat(system: str, user_parts: list[dict], model_cls: type[BaseMo
 
 
 async def _call_responses(system: str, user_parts: list[dict], model_cls: type[BaseModel],
-                          max_completion_tokens: int):
+                          max_completion_tokens: int, effort: str):
     client = _get_client()
+    extra = {"reasoning": {"effort": effort}} if effort and _mode["effort_ok"] else {}
     content = []
     for p in user_parts:
         if p["type"] == "text":
@@ -101,13 +104,14 @@ async def _call_responses(system: str, user_parts: list[dict], model_cls: type[B
         input=[{"role": "user", "content": content}],
         text=text_cfg,
         max_output_tokens=max_completion_tokens,
+        **extra,
     )
     usage = resp.usage
     return resp.output_text or "", (usage.input_tokens if usage else 0), (usage.output_tokens if usage else 0)
 
 
 async def _complete_json(system: str, user_parts: list[dict], model_cls: type[T], tag: str,
-                         max_completion_tokens: int) -> T:
+                         max_completion_tokens: int, effort: str = "") -> T:
     if config.FAKE_LLM:
         return _fake(model_cls, user_parts, tag)
     import openai
@@ -116,16 +120,20 @@ async def _complete_json(system: str, user_parts: list[dict], model_cls: type[T]
         t0 = time.monotonic()
         try:
             if _mode["api"] == "chat":
-                raw, p_tok, c_tok = await _call_chat(system, user_parts, model_cls, max_completion_tokens)
+                raw, p_tok, c_tok = await _call_chat(system, user_parts, model_cls, max_completion_tokens, effort)
             else:
-                raw, p_tok, c_tok = await _call_responses(system, user_parts, model_cls, max_completion_tokens)
+                raw, p_tok, c_tok = await _call_responses(system, user_parts, model_cls, max_completion_tokens, effort)
             obj = model_cls.model_validate_json(raw)
-            log.info("llm ok   %-22s api=%s latency=%.1fs prompt=%d completion=%d attempt=%d",
-                     tag, _mode["api"], time.monotonic() - t0, p_tok, c_tok, attempt)
+            log.info("llm ok   %-22s api=%s effort=%s latency=%.1fs prompt=%d completion=%d attempt=%d",
+                     tag, _mode["api"], effort or "default", time.monotonic() - t0, p_tok, c_tok, attempt)
             return obj
         except openai.BadRequestError as exc:
             msg = str(exc).lower()
             # Switch strategy once, then retry immediately (does not consume an attempt).
+            if effort and _mode["effort_ok"] and "reasoning" in msg:
+                log.warning("llm: API rejected reasoning effort (%s); dropping it", exc)
+                _mode["effort_ok"] = False
+                continue
             if _mode["schema"] == "json_schema" and ("schema" in msg or "response_format" in msg):
                 log.warning("llm: API rejected json_schema (%s); falling back to json_object", exc)
                 _mode["schema"] = "json_object"
@@ -153,21 +161,23 @@ async def _complete_json(system: str, user_parts: list[dict], model_cls: type[T]
 
 
 async def vision_json(system: str, user: str, image_path: str | Path, model_cls: type[T], tag: str,
-                      max_completion_tokens: int = 6000) -> T:
+                      max_completion_tokens: int = 6000, effort: str | None = None) -> T:
     """One page image + instructions -> validated model object."""
+    effort = config.EXTRACT_EFFORT if effort is None else effort
     if config.FAKE_LLM:
         return _fake(model_cls, [{"type": "text", "text": user}], tag, image_path=image_path)
     data_url = await asyncio.to_thread(_image_data_url, image_path)
     parts = [{"type": "text", "text": user},
              {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}}]
-    return await _complete_json(system, parts, model_cls, tag, max_completion_tokens)
+    return await _complete_json(system, parts, model_cls, tag, max_completion_tokens, effort)
 
 
 async def text_json(system: str, user: str, model_cls: type[T], tag: str,
-                    max_completion_tokens: int = 4000) -> T:
+                    max_completion_tokens: int = 4000, effort: str | None = None) -> T:
     """Text instructions -> validated model object."""
+    effort = config.SUMMARY_EFFORT if effort is None else effort
     parts = [{"type": "text", "text": user}]
-    return await _complete_json(system, parts, model_cls, tag, max_completion_tokens)
+    return await _complete_json(system, parts, model_cls, tag, max_completion_tokens, effort)
 
 
 # ---------- offline fake model ----------

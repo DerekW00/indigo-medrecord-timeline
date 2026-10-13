@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Medical Record Timeline</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">Medical Record Timeline</span>
+      <span class="brand-sub muted">Drop PDF bundles. Records are split, dated and summarized into one timeline.</span>
+    </div>
+
+    <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop PDF files here or press Enter to choose files">
+      <input type="file" id="file-input" multiple accept="application/pdf,.pdf" hidden>
+      <span class="dropzone-text">
+        Drop PDF bundles here or <button type="button" class="link" id="browse-btn">choose files</button>
+      </span>
+      <span id="upload-status" class="status muted" aria-live="polite"></span>
+    </div>
+
+    <ul id="doc-list" class="doc-list" aria-label="Documents"></ul>
+  </header>
+
+  <main class="main">
+    <section class="timeline" aria-label="Timeline">
+      <div class="filters">
+        <label class="filter">
+          <span>Type</span>
+          <select id="filter-type"><option value="">All types</option></select>
+        </label>
+        <label class="filter">
+          <span>Source</span>
+          <select id="filter-doc"><option value="">All PDFs</option></select>
+        </label>
+        <label class="filter check">
+          <input type="checkbox" id="filter-dups"> Show duplicates
+        </label>
+        <label class="filter check">
+          <input type="checkbox" id="filter-hidden"> Show hidden
+        </label>
+        <button type="button" id="sort-btn" class="btn small" title="Toggle sort order">Oldest first</button>
+        <span id="timeline-count" class="muted count"></span>
+      </div>
+      <div id="timeline" class="timeline-list">
+        <div class="empty">Loading…</div>
+      </div>
+    </section>
+
+    <aside id="detail" class="detail" aria-label="Record detail">
+      <div class="empty">Select a record on the timeline to read its pages and edit its fields.</div>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

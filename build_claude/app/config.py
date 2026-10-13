@@ -21,12 +21,15 @@ def _int(name: str, default: int) -> int:
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-6-luna")
 DATA_DIR = Path(os.environ.get("MRT_DATA_DIR", str(ROOT / "data"))).resolve()
-CONCURRENCY = _int("MRT_CONCURRENCY", 8)
+CONCURRENCY = _int("MRT_CONCURRENCY", 16)  # measured: 24 parallel, zero 429s
 MAX_PAGES = _int("MRT_MAX_PAGES", 0)
 FAIL_AT_PAGE = _int("MRT_FAIL_AT_PAGE", 0)
 RENDER_LONG_SIDE = _int("MRT_RENDER_LONG_SIDE", 1600)
 PORT = _int("MRT_PORT", 8000)
 FAKE_LLM = os.environ.get("MRT_FAKE_LLM", "0").strip().lower() in ("1", "true", "yes")
+# Reasoning effort per call kind ("" = API default). Measured: "low" transcribes faithfully at ~2x speed.
+EXTRACT_EFFORT = os.environ.get("MRT_EXTRACT_EFFORT", "low").strip()
+SUMMARY_EFFORT = os.environ.get("MRT_SUMMARY_EFFORT", "").strip()
 
 DB_PATH = DATA_DIR / "app.db"
 PAGES_DIR = DATA_DIR / "pages"

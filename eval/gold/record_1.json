@@ -1,0 +1,981 @@
+{
+  "filename": "record_1.pdf",
+  "source_sha256": "d820c27277834856d2c017c4a3ff40f42a67cf1d6e70fcf088d65691a1cf1c50",
+  "labeled_pages": [
+    1,
+    188
+  ],
+  "status": "AI-reviewed reference; human approval pending",
+  "record_granularity": "contiguous document or encounter export; meaningful internal splits allowed for two long chart exports",
+  "records": [
+    {
+      "id": "r01",
+      "start_page": 1,
+      "end_page": 4,
+      "date_of_service": "2025-12-29",
+      "date_confidence": "exact",
+      "record_type": "permanent_stationary_report",
+      "accepted_types": [
+        "permanent_stationary_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle permanent and stationary evaluation",
+      "summary": "The report reviews a left trimalleolar ankle fracture sustained at work on September 30, 2024, followed by open reduction and internal fixation on October 2, 2024. After 15 physical therapy visits, the patient continued to report stiffness, swelling, and limitations in some recreational activities. Examination documented a healed medial scar, moderate swelling, plantarflexion of 62 degrees, and dorsiflexion of 4 degrees. The physician deemed the patient at maximum medical improvement and permanent and stationary on December 29, 2025, with full-duty work capacity. The report assigned 7% left lower-extremity impairment and 3% whole-person impairment, apportioned entirely to the industrial injury. Future care listed treating-physician visits, podiatry follow-up, and hardware removal as needed.",
+      "key_findings": [
+        "Permanent and stationary / maximum medical improvement: 2025-12-29 (p2).",
+        "Left ankle plantarflexion 62 degrees and dorsiflexion 4 degrees (p3).",
+        "7% lower-extremity impairment; 3% whole-person impairment (p3).",
+        "100% industrial apportionment stated by physician (p3).",
+        "Full duty; future visits and possible hardware removal as needed (p4)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "fax_packet_page_missing_possible_attachment"
+      ],
+      "uncertainties": [
+        "Fax page numbering is 2/6 through 5/6. Fax page 6 is not present in this span. The visible report ends with disclosures and provider credentials rather than a truncated sentence, so this is not labeled a proven partial clinical report; an omitted attachment remains possible."
+      ]
+    },
+    {
+      "id": "r02",
+      "start_page": 5,
+      "end_page": 8,
+      "date_of_service": "2025-10-29",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle follow-up; permanent and stationary examination planned",
+      "summary": "This video follow-up addressed residual symptoms after left ankle fracture fixation. The patient had completed 15 physical therapy visits and was working full duty but reported cold-weather rigidity, morning stiffness, and tightness with prolonged standing. The limited video examination described a healed medial scar, moderate swelling, and mildly decreased dorsiflexion. Full-duty work continued, and a final permanent and stationary examination was to be scheduled for December 29, 2025.",
+      "key_findings": [
+        "15 physical therapy visits completed (p5).",
+        "Residual stiffness and swelling despite full-duty work (pp5-6).",
+        "Limited examination performed by video (p6).",
+        "Permanent and stationary examination scheduled for 2025-12-29 (pp6-7)."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r03",
+      "start_page": 9,
+      "end_page": 12,
+      "date_of_service": "2025-09-15",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle follow-up with persistent edema and improving activity",
+      "summary": "The patient reported persistent ankle swelling, morning rigidity, and tingling after prolonged sitting or walking, while being able to do more activities. She had completed 15 physical therapy visits and resumed regular work duties. The limited video examination described a healed medial scar, moderate swelling, and mildly reduced dorsiflexion. The plan was to continue full-duty work and home exercise, reassess progress toward maximum medical improvement, and likely arrange a permanent and stationary examination.",
+      "key_findings": [
+        "Persistent swelling, rigidity, and activity-related tingling (p9).",
+        "Moderate swelling and mildly decreased dorsiflexion on video examination (p10).",
+        "Full duty and home exercise continued (pp10-11).",
+        "Approaching maximum medical improvement, not yet declared permanent and stationary in this report (p10)."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r04",
+      "start_page": 13,
+      "end_page": 17,
+      "date_of_service": "2025-08-19",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Residual left ankle swelling and stiffness after return to full duty",
+      "summary": "The patient reported persistent left ankle swelling and stiffness, morning cold or tingling sensations, and difficulty with quick pivots after completing 15 physical therapy visits. She had returned to full-duty work and remained active with walking, cycling, and flexibility exercises. Examination documented a healed medial scar, mild tenderness, mildly decreased dorsiflexion, and moderate swelling. The plan was continued exercise, consideration of orthopedic consultation for possible hardware removal if symptoms persisted, and continued full-duty work while approaching maximum medical improvement.",
+      "key_findings": [
+        "15 physical therapy visits completed; full-duty work resumed (p13).",
+        "Moderate swelling and mildly decreased dorsiflexion (p14).",
+        "Possible orthopedic consultation for hardware removal if symptoms persist (p15).",
+        "Approaching maximum medical improvement (p15)."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r05",
+      "start_page": 18,
+      "end_page": 22,
+      "date_of_service": "2025-07-15",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Transition to full-duty work after left ankle fracture fixation",
+      "summary": "The patient had completed 15 physical therapy visits and continued a home exercise program after left ankle fixation. Morning stiffness, achiness, tingling, and swelling with prolonged sitting persisted, but she could cycle for 30 minutes daily and walk in the neighborhood. The limited video examination described her as well appearing and nonantalgic. Because flexibility and activity tolerance had improved and she felt ready, the plan changed her work status to full duty on July 15, 2025. A permanent and stationary examination was anticipated around one year after injury, with follow-up planned for August 19.",
+      "key_findings": [
+        "15 physical therapy visits completed (p18).",
+        "Persistent symptoms did not prevent activity (p18).",
+        "Full duty effective 2025-07-15 (p20).",
+        "Future permanent and stationary evaluation discussed (p20)."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r06",
+      "start_page": 23,
+      "end_page": 27,
+      "date_of_service": "2025-06-05",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle recovery after completion of physical therapy",
+      "summary": "After completing 15 physical therapy visits, the patient continued home exercises and reported manageable pain with morning stiffness and activity-related swelling. Compression socks, elevation, massage, and exercise helped manage symptoms, and balance and flexibility were improving. Examination documented a healed medial scar, mild tenderness, mildly decreased dorsiflexion, and moderate swelling. The plan continued exercise and compression socks, with modified duty limiting standing or walking to four hours daily and occasional stair use as tolerated through July 15, 2025.",
+      "key_findings": [
+        "15 physical therapy visits completed; continued home exercises (p23).",
+        "Moderate swelling and mild dorsiflexion limitation (p24).",
+        "Standing/walking limited to four hours daily (pp25-26).",
+        "Follow-up scheduled for 2025-07-15 (pp25-26)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "header_ocr_date_unreliable"
+      ],
+      "uncertainties": [
+        "The fax/report date is June 9, 2025; the encounter date is June 5, confirmed by the exam-date field rather than the overlapped header."
+      ]
+    },
+    {
+      "id": "r07",
+      "start_page": 28,
+      "end_page": 31,
+      "date_of_service": "2025-05-15",
+      "date_confidence": "exact",
+      "record_type": "physical_therapy",
+      "accepted_types": [
+        "physical_therapy"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Final physical therapy visit for left ankle rehabilitation",
+      "summary": "This is the fifteenth of 15 physical therapy visits, with a current entry dated May 15, 2025. The patient presented without an assistive device and reported tolerating up to 9,000 steps during recreational outings while continuing compression-stocking use. The current assessment described improved equal step length with residual weakness in the left heel raise. Treatment included step/stair practice, balance work, hip abduction, and heel raises, and the therapist documented that she could walk, use stairs, and squat as needed over an eight-hour day. The plan was discharge with continued left ankle strengthening; the specific discharge-program wording is redacted.",
+      "key_findings": [
+        "Visit count 15/15 (p28).",
+        "No assistive device at the current visit; up to 9,000 steps tolerated (p30).",
+        "Improved step length; residual left heel-raise weakness (p30).",
+        "Functional walking, stairs, and squat goal documented as achieved (p30).",
+        "Discharge with continued ankle strengthening (p30)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "carried_forward_baseline",
+        "partially_redacted_plan"
+      ],
+      "uncertainties": [
+        "Earlier portions of this note repeat the November 13, 2024 plan and baseline boot/crutch findings. They should not be presented as the May 15 examination.",
+        "The current plan reads discharge to [redacted] for continued strengthening; a specific home-program acronym cannot be recovered from this record.",
+        "The patient described work as essentially full duty, but this physical therapy report does not itself establish a formal occupational-medicine release."
+      ]
+    },
+    {
+      "id": "r08",
+      "start_page": 32,
+      "end_page": 36,
+      "date_of_service": "2025-05-01",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle follow-up after fourteen physical therapy visits",
+      "summary": "The patient had completed 14 physical therapy visits and reported swelling, stiffness, intermittent pain or tingling, and reduced tolerance for prolonged standing or walking. Examination described mild tenderness, mildly decreased dorsiflexion, moderate swelling, and a healed medial scar. The plan was one remaining physical therapy visit, continued compression socks, pain medication as needed, and continued modified duty. The narrative plan specifies walking no more than 20 minutes at a time, whereas the work-status sections specify standing or walking no more than 30 minutes at a time with rest as needed; this difference is unresolved in the source. Follow-up was scheduled for June 5, 2025.",
+      "key_findings": [
+        "14/15 physical therapy visits completed (pp32-33).",
+        "Moderate swelling and mildly reduced dorsiflexion (p33).",
+        "One remaining physical therapy visit planned (p33).",
+        "Internal discrepancy: 20-minute narrative limit versus 30-minute work-status limit (pp33-35).",
+        "Modified duty through 2025-06-05 (pp34-35)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "internal_work_restriction_discrepancy",
+        "ocr_fax_date_corrected_from_image"
+      ],
+      "uncertainties": [
+        "Page 33 says walk no more than 20 minutes at a time; pages 34-35 say stand/walk no more than 30 minutes at one time. Both are visible in the source.",
+        "OCR misreads the fax header as September 9, 2025; visual inspection shows May 5, 2025. This does not affect the clearly documented May 1 encounter date."
+      ]
+    },
+    {
+      "id": "r09",
+      "start_page": 37,
+      "end_page": 41,
+      "date_of_service": "2025-03-27",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle follow-up and request for three additional therapy visits",
+      "summary": "After 12 physical therapy visits, the patient reported improved mobility but continued tingling, cold sensations, swelling, and limited tolerance for prolonged activity. She worked a full day using a combination of remote and office work and used handrails and extra time for stairs or uneven surfaces. Examination documented a healed medial scar, mild tenderness, mildly decreased dorsiflexion, and moderate swelling. The physician requested three additional physical therapy visits and continued compression socks and modified duty limiting standing or walking to 20 minutes at one time, with occasional stairs as tolerated. Follow-up was planned for May 1, 2025.",
+      "key_findings": [
+        "12 physical therapy visits completed (pp37-38).",
+        "Three additional physical therapy visits requested (pp39-40).",
+        "Persistent cold sensations, tingling, and swelling (p37).",
+        "Modified duty: stand/walk no more than 20 minutes at one time (pp39,41)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "fax_and_report_dates_differ_from_encounter"
+      ],
+      "uncertainties": [
+        "Fax and report date April 1, 2025 must not replace the March 27 exam date. The omitted earlier fax pages are not evidence of a partial PR-2 because the clinical report starts at its own page 1.",
+        "Quoted therapist recommendation mentions three visits over six weeks, while the physician request is three visits over three weeks."
+      ]
+    },
+    {
+      "id": "r10",
+      "start_page": 42,
+      "end_page": 46,
+      "date_of_service": "2025-02-27",
+      "date_confidence": "exact",
+      "record_type": "office_visit",
+      "accepted_types": [
+        "office_visit",
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle recovery with work-hour restriction removed",
+      "summary": "The patient had completed ten physical therapy visits and reported improving mobility with persistent fatigue during longer standing or walking periods. She continued flexibility exercises and compression socks and was managing a mixture of remote and on-site work. Examination described a healed medial scar, mild tenderness, mildly decreased dorsiflexion, and moderate swelling. The plan continued physical therapy and exercises and removed the restriction on total work hours while maintaining modified activity, including standing or walking no more than 20 minutes at a time and occasional stairs as tolerated. Follow-up was planned for March 27, 2025.",
+      "key_findings": [
+        "10/12 physical therapy visits completed (pp42-44).",
+        "Improving mobility with persistent fatigue (pp43-44).",
+        "No restriction on total work hours, but activity restrictions remain (p44).",
+        "Stand/walk no more than 20 minutes at one time (p44)."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r11",
+      "start_page": 47,
+      "end_page": 51,
+      "date_of_service": "2025-01-28",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle follow-up after eight physical therapy visits",
+      "summary": "The patient had completed eight physical therapy visits and reported fluctuating swelling and difficulty with prolonged standing and stair descent after left ankle fixation. Examination described improved swelling without pitting, improved but still reduced plantarflexion and dorsiflexion, mild tenderness, and a healed medial scar. The plan continued four remaining therapy sessions, home exercises, and compression-stocking use. Modified work continued at no more than six hours daily, with standing or walking limited to 15 minutes at a time and occasional stairs as tolerated. Follow-up was scheduled for February 27, 2025.",
+      "key_findings": [
+        "8/12 physical therapy visits completed (p48).",
+        "Swelling and range of motion improved; swelling no longer pitting (p48).",
+        "Four remaining physical therapy visits planned (p49).",
+        "Work <=6 hours/day; stand/walk <=15 minutes at one time (pp49-50)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "relative_postoperative_duration_inconsistent"
+      ],
+      "uncertainties": [
+        "The note states 12 weeks after surgery although it also documents October 2, 2024 surgery and a January 28, 2025 encounter. The explicit encounter date is retained; the relative duration is not used to date the record.",
+        "The January 24 podiatry note is quoted inside this later progress report; that quotation is not a separate encounter boundary or an exact duplicate of the whole report."
+      ]
+    },
+    {
+      "id": "r12",
+      "start_page": 52,
+      "end_page": 53,
+      "date_of_service": "2025-01-24",
+      "date_confidence": "exact",
+      "record_type": "consultation",
+      "accepted_types": [
+        "consultation",
+        "office_visit"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Postoperative podiatry follow-up with stable retained hardware",
+      "summary": "This postoperative podiatry visit followed left ankle open reduction and internal fixation with flexible syndesmotic fixation documented as performed on October 2, 2024. Examination described a healed surgical site, improved edema, palpable pedal pulses, and intact sensation with mild numbness around the incision. The retained hardware was not painful, and reviewed ankle radiographs were described as showing maintained surgical correction and hardware in place. The assessment was a stable postoperative course, with activity increased as tolerated and follow-up as needed.",
+      "key_findings": [
+        "Healed surgical site and improved ankle edema (p52).",
+        "Mild perincisional numbness; sensation otherwise intact (p52).",
+        "Hardware not painful (p52).",
+        "X-ray review: correction maintained and hardware in place (p53).",
+        "Increase activities as tolerated; follow-up as needed (p53)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "relative_postoperative_duration_inconsistent"
+      ],
+      "uncertainties": [
+        "The note describes approximately 12 weeks postoperatively, inconsistent with its October 2, 2024 surgery date and January 24, 2025 visit date. The explicit visit date takes precedence.",
+        "The standalone radiology report on pages 54-55 concerns the same date but is a distinct report, not a duplicate podiatry encounter."
+      ]
+    },
+    {
+      "id": "r13",
+      "start_page": 54,
+      "end_page": 55,
+      "date_of_service": "2025-01-24",
+      "date_confidence": "exact",
+      "record_type": "imaging_report",
+      "accepted_types": [
+        "imaging_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle radiographs showing postoperative healing",
+      "summary": "Three-view left ankle radiographs were obtained for postoperative evaluation, with comparison to studies from September 30 and November 22, 2024. The report describes trimalleolar fractures after open reduction and internal fixation using four metallic plates and multiple cortical screws. The impression states radiographic healing and near-anatomic alignment, and the ankle mortise is described as congruent. Mild midfoot and hindfoot degenerative changes and diffuse mild soft-tissue swelling were also reported.",
+      "key_findings": [
+        "Three-view left ankle radiographs (p54).",
+        "Four metallic plates and multiple cortical screws (p54).",
+        "Radiographic healing and near-anatomic alignment (p54).",
+        "Congruent ankle mortise (p54).",
+        "Mild diffuse soft-tissue swelling and mild midfoot/hindfoot degeneration (p54)."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r14",
+      "start_page": 56,
+      "end_page": 61,
+      "date_of_service": "2024-12-31",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Left ankle video follow-up with further rehabilitation requested",
+      "summary": "The patient reported benefit from six completed physical therapy visits after left ankle fixation, with swelling after prolonged standing that decreased overnight. She had transitioned from a boot to regular footwear and reduced crutch use from two crutches to one, while using compression stockings and a dorsal night splint. The limited video examination described moderate pedal edema and mildly reduced plantarflexion and dorsiflexion. The plan requested six further physical therapy visits and continued compression and splint use. Modified duty was extended through January 28, 2025, allowing no more than six work hours daily and limiting standing or walking to 15 minutes at one time, with crutches as needed.",
+      "key_findings": [
+        "6/6 physical therapy visits completed (pp56-57).",
+        "Regular footwear and one crutch reported (p56).",
+        "Moderate pedal edema with mildly reduced range of motion (p57).",
+        "Six additional therapy visits requested (pp58-59).",
+        "Modified duty: <=6 work hours/day; stand/walk <=15 minutes at one time (pp58-60)."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r15",
+      "start_page": 62,
+      "end_page": 65,
+      "date_of_service": "2024-12-13",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report",
+        "work_status"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Work-status update after communication with patient",
+      "summary": "This progress report documents an update to work status based on communication with the patient concerning left ankle fracture aftercare. Modified activity was specified from December 13 through December 31, 2024. The restrictions included no more than four work hours daily, standing or walking for no more than 15 minutes at one time before resting, and occasional stair climbing or descending as tolerated. Crutches and a boot were permitted as needed, with physical therapy and consultation or referral continuing. The objective-findings section states none, and the next appointment was December 31.",
+      "key_findings": [
+        "Work-status update based on patient communication (p62).",
+        "Modified activity 2024-12-13 through 2024-12-31 (pp62-63).",
+        "Work <=4 hours/day; stand/walk <=15 minutes at one time (pp62-63).",
+        "Crutches and boot as needed (pp62-63).",
+        "No objective findings documented (p63)."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "administrative_work_status_update",
+        "crosses_assigned_end"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r16",
+      "start_page": 66,
+      "end_page": 70,
+      "date_of_service": "2024-12-06",
+      "date_confidence": "exact",
+      "record_type": "physical_therapy",
+      "accepted_types": [
+        "physical_therapy"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Physical therapy follow-up, visit 4 of 6",
+      "summary": "The fourth of six physical therapy visits addresses recovery after left ankle fracture fixation. In the specifically dated December 6 update, the patient uses bilateral crutches and still has substantial ankle and foot swelling, although the edema is no longer pitting. Treatment includes training with crutches and on a treadmill, soft-tissue work or retrograde massage, and issuance of a compression stocking. Range-of-motion work, stretching, and weight bearing through the foot are reviewed. The therapist describes slow resolution and hesitation to advance weight bearing, with recheck in one week.",
+      "key_findings": [
+        "Visit count 4/6.",
+        "Persistent swelling, no longer pitting in the dated update.",
+        "Compression stocking issued.",
+        "Training, manual therapy and range-of-motion work.",
+        "Slow resolution; recheck in one week."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "carried_forward_history_and_baseline_exam"
+      ],
+      "uncertainties": [
+        "Baseline severe edema and range-of-motion measurements appear above the separately dated December6 update and repeat the November14 initial PT findings; they are not treated as new December6 measurements.",
+        "The template includes telehealth consent despite documented hands-on interventions; encounter modality is not resolved.",
+        "Training labels, some units, and some treatment text are redacted."
+      ]
+    },
+    {
+      "id": "r17",
+      "start_page": 71,
+      "end_page": 75,
+      "date_of_service": "2024-11-26",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Occupational medicine postoperative follow-up (PR-2)",
+      "summary": "The follow-up report documents gradual improvement after left ankle fracture fixation, with continued swelling while the patient weans out of the boot and uses crutches. A limited video examination records moderate pedal edema and mildly decreased plantarflexion and dorsiflexion. Two of six physical therapy visits have been completed, and the plan is to continue therapy and the home exercise program. Authorization is requested for a left-leg compression stocking. Modified work continues through December 31, 2024, with no work activities involving walking or stairs, permission to work from home, and a four-hour daily limit.",
+      "key_findings": [
+        "Gradual improvement with persistent swelling.",
+        "Moderate pedal edema and mildly reduced ankle motion on video examination.",
+        "PT 2/6 completed; continue PT and home exercise.",
+        "Compression-stocking authorization requested.",
+        "Modified work to 2024-12-31; four hours daily from home."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "embedded_prior_note_quotes"
+      ],
+      "uncertainties": [
+        "The November22 podiatry passage and therapy quotation on page71 are reviewed history, not separate encounters within this report.",
+        "The November27 authorization signature, December3 report date, and December6 fax date do not replace the November26 service date."
+      ]
+    },
+    {
+      "id": "r18",
+      "start_page": 76,
+      "end_page": 78,
+      "date_of_service": "2024-11-14",
+      "date_confidence": "exact",
+      "record_type": "physical_therapy",
+      "accepted_types": [
+        "physical_therapy"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Initial physical therapy evaluation after ankle fixation",
+      "summary": "The initial physical therapy evaluation, visit 1 of 6, addresses left ankle stiffness, swelling, and medial pain with weight bearing after fracture fixation. The patient uses a boot and bilateral crutches, with severe foot edema and limited ability to bear weight. The examination records dorsiflexion of -5 degrees, plantarflexion of 15 degrees, trace inversion and eversion, and dorsiflexion strength of 4+/5. Treatment includes manual therapy, therapeutic exercise, and instruction, with 55 minutes of total treatment documented. The plan is weekly therapy for six weeks and an office follow-up in five days to progress activity as tolerated.",
+      "key_findings": [
+        "Visit 1/6 with severe edema and impaired weight bearing.",
+        "Dorsiflexion -5 degrees; plantarflexion 15 degrees; inversion/eversion trace.",
+        "Dorsiflexion strength 4+/5.",
+        "55 minutes total documented treatment.",
+        "Weekly therapy for six weeks; follow-up in five days."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": [
+        "The plan was established November13, but encounter headers and signature support November14 as the service date.",
+        "Telehealth consent text and hands-on treatment coexist; modality is not resolved."
+      ]
+    },
+    {
+      "id": "r19",
+      "start_page": 79,
+      "end_page": 83,
+      "date_of_service": "2024-10-29",
+      "date_confidence": "exact",
+      "record_type": "progress_report",
+      "accepted_types": [
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Occupational medicine follow-up and transition to modified work (PR-2)",
+      "summary": "The postoperative follow-up documents partial weight bearing in a boot with crutches after left ankle fracture fixation. The ankle remains diffusely swollen and tender, with markedly decreased plantarflexion and dorsiflexion. The patient is ready to begin physical therapy, and authorization is requested for up to six visits over three to six weeks. A shower stool and an additional partly redacted knee-related device are included in the equipment request. The patient transitions to modified work through November 26, 2024, with no walking or stair-related work, permission to work from home, and a four-hour daily limit.",
+      "key_findings": [
+        "Partial weight bearing with boot and crutches.",
+        "Diffuse ankle swelling/tenderness and markedly reduced motion.",
+        "PT authorization requested for up to six visits over 3–6 weeks.",
+        "Equipment authorization includes shower stool; another device name is partly redacted.",
+        "Transition to four-hour modified work through 2024-11-26."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "partly_redacted_equipment_name"
+      ],
+      "uncertainties": [
+        "The precise knee-related device name is redacted and is not reconstructed.",
+        "The October17 postoperative note on page79 is historical material within the October29 report.",
+        "The form begins on its own Page1 even though fax pagination starts at4of8; this alone does not establish a partial medical record."
+      ]
+    },
+    {
+      "id": "r20",
+      "start_page": 84,
+      "end_page": 86,
+      "date_of_service": "2024-10-17",
+      "date_confidence": "exact",
+      "record_type": "office_visit",
+      "accepted_types": [
+        "office_visit",
+        "progress_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Podiatry postoperative review and suture removal",
+      "summary": "The podiatry follow-up occurs about two weeks after left ankle open reduction and internal fixation with flexible syndesmotic fixation. The surgical site is clean and dry, and the incision remains closed without infection or wound separation after suture removal. The examination notes moderate ankle edema and mild numbness around the incision, with otherwise intact sensation and palpable pulses. X-rays are described as showing maintained surgical correction and hardware in place. The plan includes a boot with partial weight bearing, a physical therapy referral, and follow-up in four to six weeks with further imaging.",
+      "key_findings": [
+        "Stable postoperative course approximately two weeks after surgery.",
+        "Sutures removed; incision closed without signs of infection or separation.",
+        "Moderate edema and mild perincisional numbness.",
+        "Correction maintained and hardware in place on reviewed X-rays.",
+        "Boot/partial weight bearing, PT referral and 4–6 week follow-up."
+      ],
+      "flags": [
+        "provider_name_redacted"
+      ],
+      "uncertainties": [
+        "The DOS10/2/24 line identifies the prior surgery; the actual follow-up encounter is October17.",
+        "The boot descriptor is redacted and is not supplied."
+      ]
+    },
+    {
+      "id": "r21",
+      "start_page": 87,
+      "end_page": 91,
+      "date_of_service": "2024-10-08",
+      "date_confidence": "exact",
+      "record_type": "office_visit",
+      "accepted_types": [
+        "office_visit",
+        "form_other"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Initial occupational medicine evaluation / Doctor First Report",
+      "summary": "The initial occupational medicine evaluation reviews a September 30 work-related stair fall causing a displaced left trimalleolar fracture and the October 2 surgical fixation. The patient reports using Tylenol and oxycodone for postoperative pain and stopping Celebrex and another redacted medication after heat and tingling sensations. She remains non-weight bearing with crutches and a boot and reports mobility difficulties at a second-floor home without an elevator. A limited video examination documents no apparent distress and a compression wrap on the left lower extremity. The report requests authorization for medical transportation and retroauthorization for surgery and podiatry follow-up, and places the patient off work from October 8 through October 29, 2024.",
+      "key_findings": [
+        "Initial occupational evaluation after September 30 injury and October 2 ORIF.",
+        "Non-weight bearing with crutches and boot.",
+        "Reported heat/tingling after Celebrex and another redacted medication.",
+        "Medical transportation and retroauthorization requested.",
+        "Off work2024-10-08 through 2024-10-29."
+      ],
+      "flags": [
+        "provider_name_redacted",
+        "redacted_medication_name"
+      ],
+      "uncertainties": [
+        "One medication associated with reported adverse sensations is redacted; it is not identified.",
+        "This is the October8 initial occupational evaluation, not the September30 emergency treatment or October2 operation."
+      ]
+    },
+    {
+      "id": "r22",
+      "start_page": 92,
+      "end_page": 148,
+      "date_of_service": "2024-10-02",
+      "date_confidence": "exact",
+      "record_type": "hospital_record",
+      "accepted_types": [
+        "hospital_record"
+      ],
+      "allow_internal_splits": true,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Same-day admission for left ankle fracture fixation",
+      "summary": "This same-day podiatry admission documents open reduction and internal fixation of the displaced left trimalleolar ankle fracture. The long operative report describes a comminuted distal fibular fracture with a Wagstaffe component, a posterior malleolar fracture with a posteromedial die-punch fragment, and a transverse medial malleolar fracture. Plates and screws plus two Synchfix suture buttons are described, with fluoroscopy confirming reduction, implant position, and a well-aligned ankle mortise. General anesthesia and left adductor-canal and popliteal continuous nerve blocks are documented, with no operative complications or apparent postoperative anesthesia complications recorded. Postoperative tibia/fibula imaging describes intact hardware, while the ankle radiology report contains conflicting left-versus-right labels. The patient was discharged home in stable condition the same day, with boot use, suture removal at two weeks, and radiographs at six weeks documented in the postoperative plan.",
+      "key_findings": [
+        "Left trimalleolar fracture treated by ORIF on 2024-10-02.",
+        "Syndesmosis fixation with two Synchfix suture buttons.",
+        "Operative reduction and ankle mortise alignment described as satisfactory.",
+        "No operative or apparent postoperative anesthesia complications; stable same-day discharge home.",
+        "Ankle radiology order says LEFT while narrative/technique say RIGHT."
+      ],
+      "flags": [
+        "provider_names_redacted_or_partial",
+        "specific_facility_redacted",
+        "contains_repeated_internal_notes",
+        "contains_prior_encounter_history",
+        "source_laterality_conflict",
+        "internal_note_fragments",
+        "crosses_assigned_end_boundary"
+      ],
+      "uncertainties": [
+        "Specific hospital/unit and complete treating-provider names are redacted.",
+        "Page112 has a LEFT ankle order and RIGHT ankle narrative, technique and exam-description field; no side correction is inferred.",
+        "Page104 opens mid-sentence in catheter instructions; no preceding instruction section is supplied there.",
+        "The repeated long operative report on137–138 stops at the Complications heading before the anesthesia section; the earlier copy104–111 supplies the complete operative outcome.",
+        "The coherent popliteal-block narrative ends on148 without the electronic-signature footer seen in its earlier copy125; this alone does not establish a missing clinical ending or a partial top-level record.",
+        "Estimated blood loss is10 with its unit redacted; no unit is inferred.",
+        "September30 source H&P and October1,3,6,7 signatures/attestations are not new admission dates.",
+        "The postoperative plan contains redacted words around Toe touch and Boot; only directly visible plan details are summarized."
+      ]
+    },
+    {
+      "id": "r23",
+      "start_page": 149,
+      "end_page": 150,
+      "date_of_service": "2024-09-30",
+      "date_confidence": "exact",
+      "record_type": "imaging_report",
+      "accepted_types": [
+        "imaging_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Initial left ankle radiographs",
+      "summary": "Three-view left ankle radiographs were obtained for trauma and concern for fracture. The report describes an acute comminuted displaced trimalleolar fracture, an incongruent ankle mortise, and prominent anterior subluxation of the tibia at the tibiotalar joint. It also documents prominent widening of the anterior ankle mortise. This is the initial 1:15 PM study, not the later post-reduction studies.",
+      "key_findings": [
+        "Acute displaced comminuted trimalleolar fracture.",
+        "Anterior tibial subluxation and incongruent ankle mortise.",
+        "Accession 11807276580; exam ended 1:15 PM."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "scan_artifacts",
+        "same_study_in_ED_export"
+      ],
+      "uncertainties": [
+        "Radiologist and most facility information are redacted."
+      ]
+    },
+    {
+      "id": "r24",
+      "start_page": 151,
+      "end_page": 152,
+      "date_of_service": "2024-10-02",
+      "date_confidence": "exact",
+      "record_type": "operative_report",
+      "accepted_types": [
+        "operative_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": true,
+      "partial_end": false,
+      "title": "Operative report component 2 of 2 — implant inventory tail and disposition",
+      "summary": "This operative-report component contains the final implant-inventory entries for the left ankle procedure. It lists two 40-mm screws, one 34-mm screw, and one 30-mm screw as implanted. The ending records a stable condition and disposition to the post-anesthesia care unit, then home. The component is labeled 2 of 2 and does not include the procedure narrative.",
+      "key_findings": [
+        "Three final screw inventory entries.",
+        "Stable postoperative condition.",
+        "Disposition: PACU then home.",
+        "Component 2 of 2; complementary to the long-operative component."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "clinical_tail_component",
+        "scan_artifacts"
+      ],
+      "uncertainties": [
+        "The two-page wrapper is complete, but its clinical content starts mid-report and should be linked to the other operative component.",
+        "The header is crossed by fax text; the visit date remains readable."
+      ]
+    },
+    {
+      "id": "r25",
+      "start_page": 153,
+      "end_page": 154,
+      "date_of_service": "2024-10-02",
+      "date_confidence": "exact",
+      "record_type": "hospital_record",
+      "accepted_types": [
+        "hospital_record",
+        "consultation"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Ambulatory surgery discharge summary — workers compensation form copy",
+      "summary": "The ambulatory surgery discharge summary documents left ankle open reduction and internal fixation for a displaced trimalleolar fracture. Admission and discharge both occurred on October 2. The hospital course is recorded as having no complications, and the discharge condition is stable. Medication instructions and follow-up are deferred to the patient discharge instructions or after-visit summary.",
+      "key_findings": [
+        "Left ankle ORIF for displaced trimalleolar fracture.",
+        "October 2 admission and same-day discharge.",
+        "Stable condition and no hospital-course complications recorded."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "near_duplicate",
+        "scan_artifacts"
+      ],
+      "uncertainties": [
+        "Although the wrapper says consultation, the enclosed clinical document is a discharge summary."
+      ]
+    },
+    {
+      "id": "r26",
+      "start_page": 155,
+      "end_page": 156,
+      "date_of_service": "2024-10-02",
+      "date_confidence": "exact",
+      "record_type": "hospital_record",
+      "accepted_types": [
+        "hospital_record",
+        "consultation"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "duplicate_of": "r25",
+      "duplicate_kind": "near",
+      "title": "Ambulatory surgery discharge summary — workers compensation form copy",
+      "summary": "The ambulatory surgery discharge summary documents left ankle open reduction and internal fixation for a displaced trimalleolar fracture. Admission and discharge both occurred on October 2. The hospital course is recorded as having no complications, and the discharge condition is stable. Medication instructions and follow-up are deferred to the patient discharge instructions or after-visit summary.",
+      "key_findings": [
+        "Left ankle ORIF for displaced trimalleolar fracture.",
+        "October 2 admission and same-day discharge.",
+        "Stable condition and no hospital-course complications recorded."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "near_duplicate"
+      ],
+      "uncertainties": [
+        "Although the wrapper says consultation, the enclosed clinical document is a discharge summary."
+      ]
+    },
+    {
+      "id": "r27",
+      "start_page": 157,
+      "end_page": 165,
+      "date_of_service": "2024-10-02",
+      "date_confidence": "exact",
+      "record_type": "operative_report",
+      "accepted_types": [
+        "operative_report"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Long operative report — left trimalleolar ankle fixation, component 1 of 2",
+      "summary": "The report documents open reduction and internal fixation of the left trimalleolar ankle fracture under general anesthesia with nerve blocks. Findings include a comminuted distal fibular fracture with a Wagstaffe component, a posterior malleolar fracture with a die-punch fragment, and a transverse medial malleolar fracture. Plate-and-screw fixation and two syndesmotic suture buttons were placed, with fluoroscopy confirming appropriate reduction and a well-aligned ankle mortise. The patient tolerated the procedure, and the report records no complications. The postoperative plan lists toe touch in a boot, suture removal at two weeks, and radiographs at six weeks.",
+      "key_findings": [
+        "Trimalleolar ankle fixation with plates, screws and two syndesmotic buttons.",
+        "Stable fixation and aligned ankle mortise.",
+        "No complications recorded.",
+        "Two-week suture removal and six-week radiographs planned.",
+        "Component 1 of 2 includes procedure narrative and most implant entries."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "split_report_component",
+        "same_operative_narrative_in_admission"
+      ],
+      "uncertainties": [
+        "The form has its own closing declaration, so it is not marked as truncated. Additional final inventory/disposition content appears in the separately wrapped 2-of-2 component at pages 151–152.",
+        "The estimated-blood-loss unit and parts of the boot instruction are redacted and were not reconstructed."
+      ]
+    },
+    {
+      "id": "r28",
+      "start_page": 166,
+      "end_page": 178,
+      "date_of_service": "2024-09-30",
+      "date_confidence": "exact",
+      "record_type": "hospital_record",
+      "accepted_types": [
+        "hospital_record"
+      ],
+      "allow_internal_splits": true,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Emergency department encounter for work-related left ankle fracture-dislocation",
+      "summary": "The patient presented after missing steps at work and injuring the left ankle, with deformity and inability to bear weight; right-foot tenderness was also documented. Imaging showed a displaced comminuted left trimalleolar fracture-dislocation, while right-foot radiographs showed no acute fracture or dislocation. Podiatry performed two closed-reduction attempts, with improved alignment after the second attempt and preserved neurovascular status. A CT study documented the comminuted fracture and disruption of the ankle mortise for operative planning. The patient was discharged home with crutches, instructions not to bear weight on the left leg, and podiatry follow-up for planned surgery.",
+      "key_findings": [
+        "Work-related left ankle trimalleolar fracture-dislocation.",
+        "Two reduction attempts; later radiographs show improved alignment.",
+        "Right foot radiographs negative for acute fracture/dislocation.",
+        "CT confirms comminution and mortise disruption.",
+        "Discharged home with crutches and non-weight-bearing instructions."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "contains_multiple_distinct_imaging_studies",
+        "canonical_for_partial_ED_repeat"
+      ],
+      "uncertainties": [
+        "Individual clinician names and precise facility location are redacted.",
+        "The H&P records an unusual lidocaine concentration literally printed as 12%; no correction or dose inference was made.",
+        "Serial same-day ankle radiographs have different accessions and results; they must not be collapsed into one duplicate study."
+      ]
+    },
+    {
+      "id": "r29",
+      "start_page": 179,
+      "end_page": 181,
+      "date_of_service": "2024-09-30",
+      "date_confidence": "exact",
+      "record_type": "consultation",
+      "accepted_types": [
+        "consultation"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Podiatric surgery history and physical — workers compensation copy",
+      "summary": "The podiatric consultation describes left ankle pain and deformity after a workplace fall down steps. Examination and radiographs supported an unstable trimalleolar ankle fracture, with medial skin tenting and preserved distal circulation and sensation. Two closed reductions were performed, with the second producing improved alignment; a posterior splint with stirrups was applied. The plan was non-weight-bearing with crutches, elevation and ice, CT for preoperative planning, and open reduction and internal fixation after discussion of risks, benefits and alternatives.",
+      "key_findings": [
+        "Unstable left trimalleolar fracture.",
+        "Two closed reductions; second documented as successful.",
+        "Posterior splint, crutches and non-weight-bearing plan.",
+        "CT and operative fixation planned."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "reformatted_H_and_P_copy"
+      ],
+      "uncertainties": [
+        "This form omits history and laboratory sections present in the embedded H&P, so it is not an exact complete duplicate of that H&P.",
+        "Detailed lidocaine concentration text is left unnormalized."
+      ]
+    },
+    {
+      "id": "r30",
+      "start_page": 182,
+      "end_page": 184,
+      "date_of_service": "2024-09-30",
+      "date_confidence": "exact",
+      "record_type": "hospital_record",
+      "accepted_types": [
+        "hospital_record"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": true,
+      "duplicate_of": "r28",
+      "duplicate_kind": "partial",
+      "title": "Emergency department record — partial exact repeat",
+      "summary": "These pages repeat the beginning of the September 30 emergency department encounter. They describe the workplace fall, left ankle trimalleolar fracture-dislocation, right-foot tenderness with negative right-foot radiographs, and two reduction attempts. The first page includes the later disposition note stating that post-reduction alignment looked good and the patient would go home with crutches without bearing weight on the left leg. This copy stops before the remaining provider signature, podiatry consultation, discharge instructions, laboratory report and full imaging section present in the longer export.",
+      "key_findings": [
+        "Same September 30 ED encounter.",
+        "Three page-image and OCR matches to pages 166–168.",
+        "Only the first portion of the full ED export is present."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "exact_page_duplicate",
+        "partial_duplicate"
+      ],
+      "uncertainties": []
+    },
+    {
+      "id": "r31",
+      "start_page": 185,
+      "end_page": 188,
+      "date_of_service": "2024-09-30",
+      "date_confidence": "exact",
+      "record_type": "form_other",
+      "accepted_types": [
+        "form_other",
+        "hospital_record"
+      ],
+      "allow_internal_splits": false,
+      "partial_start": false,
+      "partial_end": false,
+      "title": "Doctor’s First Report of Occupational Injury or Illness",
+      "summary": "This occupational injury form identifies a workplace fall involving missed steps and lists a displaced left trimalleolar fracture as the diagnosis. It reproduces the emergency department history, examination, imaging summaries and treatment narrative from the September 30 encounter. The treatment section records reduction attempts, podiatry involvement, non-weight-bearing instructions and discharge home with crutches. The work-status checkboxes, return-to-work dates and specific-restriction field are blank in this copy.",
+      "key_findings": [
+        "Occupational injury report for September 30 encounter.",
+        "Left displaced trimalleolar fracture, S82.852A.",
+        "Reuses ED narrative and disposition.",
+        "Work-status fields are uncompleted."
+      ],
+      "flags": [
+        "redacted_identifiers",
+        "same_encounter_different_document",
+        "blank_work_status_fields"
+      ],
+      "uncertainties": [
+        "No work-capacity conclusion or return-to-work date can be extracted from the empty fields.",
+        "Form creation/report date is October 7, but it documents September 30 care."
+      ]
+    }
+  ],
+  "duplicate_pairs": [
+    {
+      "canonical_id": "r25",
+      "duplicate_id": "r26",
+      "kind": "near",
+      "scope": "whole_record",
+      "evidence_pages": [
+        153,
+        154,
+        155,
+        156
+      ],
+      "reason": "Same discharge-note content and service date; different fax wrappers, formatting, and redactions."
+    },
+    {
+      "canonical_id": "r28",
+      "duplicate_id": "r30",
+      "kind": "partial",
+      "content_match": "exact",
+      "scope": "record_subset",
+      "evidence_pages": [
+        166,
+        167,
+        168,
+        182,
+        183,
+        184
+      ],
+      "reason": "Three rendered page JPEGs are byte-identical; the full canonical ED export has 13 pages."
+    }
+  ]
+}

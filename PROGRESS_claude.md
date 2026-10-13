@@ -7,14 +7,14 @@ Clock: build started 13:38 PT (20:38 UTC) 2026-10-13. Freeze 16:30 PT (23:30 UTC
 
 ## Blockers
 
-- [ ] `OPENAI_API_KEY` is not available in this session (not in env, no `.env` in repo or home).
+- [x] `OPENAI_API_KEY` found in the repo root `.env` at 20:46 UTC; was not available in this session (not in env, no `.env` in repo or home).
       Put it in `build_claude/.env` (`cp env.example .env`, edit) or `/Users/dw/indigo/.env`.
       Everything below is built and tested against `MRT_FAKE_LLM=1` until the key lands.
 
 ## Milestones
 
 - [x] M0 skeleton: `requirements.txt`, `env.example`, `.gitignore`, `app/config.py`, `app/models.py`, `app/db.py`, `app/llm.py` (Chat Completions json_schema strict, json_object fallback, Responses API fallback, 3 attempts, fake mode), `scripts/probe_model.py`
-- [ ] M0 probe against the real `gpt-6-luna` (needs key)
+- [x] M0 probe against the real `gpt-6-luna`: Chat Completions + json_schema strict accepted image, 6.6 s (20:47 UTC)
 - [ ] M1 pipeline: render, extract, group (+tests), summarize, `scripts/process.py`
 - [ ] M1 full 188-page run (needs key)
 - [ ] M2 server + UI

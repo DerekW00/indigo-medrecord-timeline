@@ -1,0 +1,317 @@
+{
+ "filename": "record_1.pdf",
+ "labeled_pages": [
+  1,
+  188
+ ],
+ "status": "DRAFT-claude v2: derived from a gpt-6-luna per-page pass plus code rules, then every uncertain span (23-27, 28-31, 32-36, 37-41, 42-46, 151-152) checked against the rendered page images by Claude on 2026-10-13 14:05-14:08 PT. 31 records, contiguous, covering pages 1-188. Still needs one human pass before it is called gold.",
+ "records": [
+  {
+   "id": "r01",
+   "start_page": 1,
+   "end_page": 4,
+   "date_of_service": "2025-12-29",
+   "record_type": "permanent_stationary_report",
+   "note": "PR-4; bundle starts at fax page 2/6, fax 6/6 absent; partial_start",
+   "accepted_types": [
+    "permanent_stationary_report",
+    "progress_report"
+   ],
+   "partial_start": true
+  },
+  {
+   "id": "r02",
+   "start_page": 5,
+   "end_page": 8,
+   "date_of_service": "2025-10-29",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 10/30/2025 3:17:27 PM, pages 2/5-5/5, form Page 1-4"
+  },
+  {
+   "id": "r03",
+   "start_page": 9,
+   "end_page": 12,
+   "date_of_service": "2025-09-15",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 9/16/2025 4:26:36 PM"
+  },
+  {
+   "id": "r04",
+   "start_page": 13,
+   "end_page": 17,
+   "date_of_service": "2025-08-19",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 8/20/2025 3:46:47 PM"
+  },
+  {
+   "id": "r05",
+   "start_page": 18,
+   "end_page": 22,
+   "date_of_service": "2025-07-15",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 7/17/2025 3:56:29 PM"
+  },
+  {
+   "id": "r06",
+   "start_page": 23,
+   "end_page": 27,
+   "date_of_service": "2025-06-05",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 6/9/2025 2:37:02 PM pages 2/6-6/6, form Page 1-5. Eye-checked 14:05 PT: one record; service date is the exam date 06-05-2025 (6/9 is the report/fax date)"
+  },
+  {
+   "id": "r07",
+   "start_page": 28,
+   "end_page": 31,
+   "date_of_service": "2025-05-15",
+   "record_type": "physical_therapy",
+   "note": "Kaiser chart printout 05/15/2025 Work Comp in Occupational Med Dept, PT progress note, p31 '(continued)'. Eye-checked 14:05 PT: one record",
+   "accepted_types": [
+    "physical_therapy",
+    "office_visit",
+    "progress_report"
+   ]
+  },
+  {
+   "id": "r08",
+   "start_page": 32,
+   "end_page": 36,
+   "date_of_service": "2025-05-01",
+   "record_type": "progress_report",
+   "note": "PR-2, fax KPRFC004 5/5/2025 12:16:13 PM pages 2/6-6/6, exam 05-01-2025. Eye-checked 14:05 PT: one record"
+  },
+  {
+   "id": "r09",
+   "start_page": 37,
+   "end_page": 41,
+   "date_of_service": "2025-03-27",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 'From tty56 01 Apr 2025 11:22:56 AM PDT' pages 4/8-8/8, form Page 1-5, exam 03-27-2025 (04-01 is the report date). Eye-checked 14:08 PT: ONE record; the model split it 37-39 / 40-41 because pages 37-39 carried the report date as service date"
+  },
+  {
+   "id": "r10",
+   "start_page": 42,
+   "end_page": 46,
+   "date_of_service": "2025-02-27",
+   "record_type": "progress_report",
+   "note": "Kaiser chart printout 02/27/2025 Work Comp in Occupational Health Dept, PR-2 narrative, p46 '(continued)'. Eye-checked 14:05 PT: one record",
+   "accepted_types": [
+    "progress_report",
+    "office_visit"
+   ]
+  },
+  {
+   "id": "r11",
+   "start_page": 47,
+   "end_page": 51,
+   "date_of_service": "2025-01-28",
+   "record_type": "progress_report",
+   "note": "PR-2"
+  },
+  {
+   "id": "r12",
+   "start_page": 52,
+   "end_page": 53,
+   "date_of_service": "2025-01-24",
+   "record_type": "consultation",
+   "note": "Consultative evaluation and opinion"
+  },
+  {
+   "id": "r13",
+   "start_page": 54,
+   "end_page": 55,
+   "date_of_service": "2025-01-24",
+   "record_type": "imaging_report",
+   "note": "Imaging report / radiology record"
+  },
+  {
+   "id": "r14",
+   "start_page": 56,
+   "end_page": 61,
+   "date_of_service": "2024-12-31",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 1/2/2025 12:26:22 PM, 2/7-7/7"
+  },
+  {
+   "id": "r15",
+   "start_page": 62,
+   "end_page": 65,
+   "date_of_service": "2024-12-13",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 12/16/2024 2:56:30 PM"
+  },
+  {
+   "id": "r16",
+   "start_page": 66,
+   "end_page": 70,
+   "date_of_service": "2024-12-06",
+   "record_type": "physical_therapy",
+   "note": "PT report, letterhead repeated on every page (model says starts_new_record on each) - rule 3 test case"
+  },
+  {
+   "id": "r17",
+   "start_page": 71,
+   "end_page": 75,
+   "date_of_service": "2024-11-26",
+   "record_type": "progress_report",
+   "note": "PR-2, fax 12/6/2024 12:07:36 AM"
+  },
+  {
+   "id": "r18",
+   "start_page": 76,
+   "end_page": 78,
+   "date_of_service": "2024-11-14",
+   "record_type": "physical_therapy",
+   "note": "PT note, no fax header",
+   "accepted_types": [
+    "physical_therapy",
+    "office_visit"
+   ]
+  },
+  {
+   "id": "r19",
+   "start_page": 79,
+   "end_page": 83,
+   "date_of_service": "2024-10-29",
+   "record_type": "progress_report",
+   "note": "PR-2; fax header changes at p81 (10:26:26 -> 10:33:34) while form Page 1-5 continue - label rule must win"
+  },
+  {
+   "id": "r20",
+   "start_page": 84,
+   "end_page": 86,
+   "date_of_service": "2024-10-17",
+   "record_type": "consultation",
+   "note": "Secondary treating physician report, fax 10/31/2024 9:45:33 AM 2/4-4/4",
+   "accepted_types": [
+    "consultation",
+    "progress_report",
+    "office_visit"
+   ]
+  },
+  {
+   "id": "r21",
+   "start_page": 87,
+   "end_page": 91,
+   "date_of_service": "2024-10-08",
+   "record_type": "office_visit",
+   "note": "Doctor's First Report (DWC 5021) with Continuation pages 2-5, no fax header",
+   "accepted_types": [
+    "office_visit",
+    "form_other",
+    "progress_report"
+   ]
+  },
+  {
+   "id": "r22",
+   "start_page": 92,
+   "end_page": 148,
+   "date_of_service": "2024-10-02",
+   "record_type": "hospital_record",
+   "note": "Kaiser admission chart printout, 57 pages, every page '(continued)'; splitting into notes acceptable",
+   "accepted_types": [
+    "hospital_record",
+    "operative_report"
+   ],
+   "allow_internal_splits": true
+  },
+  {
+   "id": "r23",
+   "start_page": 149,
+   "end_page": 150,
+   "date_of_service": "2024-09-30",
+   "record_type": "imaging_report",
+   "note": "X-ray left ankle result, marked 1/2 and 2/2, inside the 25-page KPRFDT001 fax"
+  },
+  {
+   "id": "r24",
+   "start_page": 151,
+   "end_page": 152,
+   "date_of_service": "2024-10-02",
+   "record_type": "operative_report",
+   "note": "Kaiser On-the-Job Operative Report Page 1-2 inside the KPRFDT001 11/18/2024 fax (PAGE 18/025); Visit 10-02-2024, report date 10-07-2024. Eye-checked 14:05 PT: one record, service date 2024-10-02"
+  },
+  {
+   "id": "r25",
+   "start_page": 153,
+   "end_page": 154,
+   "date_of_service": "2024-10-02",
+   "record_type": "hospital_record",
+   "note": "Discharge note / consultative evaluation, Page 1-2",
+   "accepted_types": [
+    "hospital_record",
+    "consultation"
+   ]
+  },
+  {
+   "id": "r26",
+   "start_page": 155,
+   "end_page": 156,
+   "date_of_service": "2024-10-02",
+   "record_type": "hospital_record",
+   "note": "Same 2-page note printed again (near duplicate of r26, 3-gram Jaccard 0.64 naive)",
+   "accepted_types": [
+    "hospital_record",
+    "consultation"
+   ],
+   "duplicate_of": "r25",
+   "duplicate_kind": "near"
+  },
+  {
+   "id": "r27",
+   "start_page": 157,
+   "end_page": 165,
+   "date_of_service": "2024-10-02",
+   "record_type": "operative_report",
+   "note": "Operative report fax 10/7/2024 4:45:31 PM 2/10-10/10; letterhead repeated, model flags starts on 157,158,161,163,164 - rule 3 test case"
+  },
+  {
+   "id": "r28",
+   "start_page": 166,
+   "end_page": 178,
+   "date_of_service": "2024-09-30",
+   "record_type": "hospital_record",
+   "note": "Kaiser ED visit printout, 13 pages; splitting into notes acceptable",
+   "accepted_types": [
+    "hospital_record",
+    "office_visit"
+   ],
+   "allow_internal_splits": true
+  },
+  {
+   "id": "r29",
+   "start_page": 179,
+   "end_page": 181,
+   "date_of_service": "2024-09-30",
+   "record_type": "consultation",
+   "note": "Consultative evaluation, Page 1-3"
+  },
+  {
+   "id": "r30",
+   "start_page": 182,
+   "end_page": 184,
+   "date_of_service": "2024-09-30",
+   "record_type": "hospital_record",
+   "note": "Exact re-scan of pages 166-168 (Jaccard 0.97); partial duplicate of r29",
+   "accepted_types": [
+    "hospital_record",
+    "office_visit"
+   ],
+   "duplicate_of": "r28",
+   "duplicate_kind": "exact"
+  },
+  {
+   "id": "r31",
+   "start_page": 185,
+   "end_page": 188,
+   "date_of_service": "2024-09-30",
+   "record_type": "office_visit",
+   "note": "Doctor's First Report with Continuation pages 2-4, no fax header",
+   "accepted_types": [
+    "office_visit",
+    "form_other",
+    "progress_report"
+   ]
+  }
+ ]
+}

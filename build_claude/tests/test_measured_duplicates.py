@@ -190,3 +190,30 @@ def test_copy_store_requires_fresh_separate_destination_and_rewrites_paths(tmp_p
     assert (source / "app.db").read_bytes() == before
     with pytest.raises(ValueError):
         copy_store(source, destination)
+
+
+def test_incomplete_text_cannot_prove_exact_text_match():
+    a, b = near_pair()
+    b["text"] = a["text"]
+    b["text_complete"] = False
+    assert dedupe.find_duplicates([a, b], exact_only=True) == []
+
+
+def test_confirmation_budget_caps_calls_and_never_retries_reversed_pair(monkeypatch):
+    common = " ".join(f"clinical{n}" for n in range(100))
+    items = [record(str(n), [None], common + f" extra{n}", text_complete=True,
+                    transcription=common + f" extra{n}") for n in range(6)]
+    calls, evidence, published = [], [], []
+
+    async def uncertain(a, b):
+        calls.append((a["id"], b["id"]))
+        return decision(a, b, relation="uncertain")
+
+    monkeypatch.setattr(dedupe, "_load_items", lambda: items)
+    monkeypatch.setattr(dedupe, "confirm_pair", uncertain)
+    monkeypatch.setattr(db, "replace_duplicate_groups", published.extend)
+    asyncio.run(dedupe.dedupe_all(max_confirmations=8, evidence=evidence))
+    assert len(calls) == 8
+    assert len({frozenset(pair) for pair in calls}) == 8
+    assert len(evidence) == 15 and not published
+    assert sum(e.get("skipped") == "confirmation budget" for e in evidence) == 7

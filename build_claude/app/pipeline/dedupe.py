@@ -163,7 +163,8 @@ def exact_relation(a: dict, b: dict) -> str | None:
         return "exact_image" if ah == bh else "partial_exact"
     # Preserve signs/decimals: the old punctuation-stripping hash cannot prove clinical equality.
     at, bt = clinical_text(a.get("text", "")), clinical_text(b.get("text", ""))
-    if len(at.split()) >= MIN_WORDS and at == bt:
+    if (a.get("text_complete", True) and b.get("text_complete", True)
+            and len(at.split()) >= MIN_WORDS and at == bt):
         return "exact"
     return None
 

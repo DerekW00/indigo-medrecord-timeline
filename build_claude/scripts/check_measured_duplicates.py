@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -54,6 +55,7 @@ def main() -> None:
     parser.add_argument("--expect-hits", type=int, required=True)
     parser.add_argument("--gold", type=Path, required=True)
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     destination = args.data_dir.resolve()
     copy_store(args.source_data, destination)
     os.environ["MRT_DATA_DIR"] = str(destination)
@@ -80,12 +82,15 @@ def main() -> None:
                    "--out", str(destination / "eval.json")])
     report = json.loads((destination / "eval.json").read_text())
     metrics = report["boundaries"]["duplicates"]
-    assert metrics["hits"] == args.expect_hits and metrics["false_pairs"] == 0, metrics
     assert_negatives(db.get_records(doc["id"]), db.get_duplicate_groups())
     after = {t: db.connect().execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in before}
     assert before == after, "source rows must be preserved"
-    print(json.dumps({"mode": args.mode, "hits": metrics["hits"], "false_pairs": metrics["false_pairs"],
-                      "source_rows_preserved": before, "data_dir": str(destination)}))
+    checks = {"mode": args.mode, "hits": metrics["hits"], "expected_hits": args.expect_hits,
+              "false_pairs": metrics["false_pairs"], "negative_pairs_separate": True,
+              "source_rows_preserved": before, "data_dir": str(destination)}
+    (destination / "checks.json").write_text(json.dumps(checks, indent=2) + "\n")
+    print(json.dumps(checks))
+    assert metrics["hits"] == args.expect_hits and metrics["false_pairs"] == 0, "duplicate acceptance gate unmet"
 
 
 if __name__ == "__main__":

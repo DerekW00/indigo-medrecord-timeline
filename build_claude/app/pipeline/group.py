@@ -212,6 +212,15 @@ def _fax_pos(sig: PageSignals) -> str:
 def boundary_reason(cur: PageSignals, prev: PageSignals, cur_f: _Fax, prev_f: _Fax) -> str | None:
     """Section 7 rules 1 to 8 for one page. Returns the reason when `cur` starts a new
     record, or None when it continues the record of `prev`."""
+    # A printed first/second page pair is stronger evidence than an unreadable fax
+    # counter or a drifting page classifier. Do not suppress headings, resets or dates.
+    printed_pair = (prev.page_label is not None and prev.page_label.k == 1
+                    and cur.page_label is not None and cur.page_label.k == 2)
+    fax_reset = (cur.fax_page is not None and
+                 (cur.fax_page.k == 1 or
+                  (prev.fax_page is not None and cur.fax_page.k <= prev.fax_page.k)))
+    if printed_pair and not cur.starts_new_record and not fax_reset and not _dates_differ(cur, prev):
+        return None
     same_fax = _same_fax(cur, prev, cur_f, prev_f)
     if same_fax or _label_continues(cur, prev):
         # Rule 3: inside one fax, or while page labels continue, only a confident new heading

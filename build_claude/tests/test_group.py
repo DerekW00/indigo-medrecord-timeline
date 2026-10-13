@@ -619,3 +619,29 @@ def test_group_document_replaces_stale_records(temp_db):
     assert [(r["start_page"], r["end_page"]) for r in new] == [(1, 2), (3, 4)]
     assert {r["id"] for r in db.get_records(doc)} == {r["id"] for r in new}
     assert db.get_record(old[0]["id"]) is None
+
+
+def test_printed_first_second_page_pair_survives_type_and_opaque_fax_drift():
+    pages = [pg(new=True, conf="high", header="FAX ALPHA", k=8, n=12,
+                label=1, dtype="hospital_record", date="2026-01-08"),
+             pg(header="FAX BETA", label=2, dtype="consultation", date="2026-01-08")]
+    assert spans_of(pages) == [(1, 2)]
+    pages[1].date_of_service = None
+    assert spans_of(pages) == [(1, 2)]
+
+
+@pytest.mark.parametrize("change", ["heading", "date", "reset", "label_gap"])
+def test_printed_pair_fallback_preserves_real_boundaries(change):
+    first = pg(new=True, conf="high", header="FAX ALPHA", k=8, n=12,
+               label=1, dtype="hospital_record", date="2026-01-08")
+    second = pg(header="FAX BETA", label=2, dtype="consultation", date="2026-01-08")
+    if change == "heading":
+        second.starts_new_record = True
+        second.boundary_confidence = "high"
+    elif change == "date":
+        second.date_of_service = "2026-01-09"
+    elif change == "reset":
+        second.fax_page = FaxPage(k=1, n=12)
+    else:
+        second.page_label = FaxPage(k=3)
+    assert spans_of([first, second]) == [(1, 1), (2, 2)]

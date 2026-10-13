@@ -21,9 +21,10 @@ import hashlib
 import logging
 import re
 import threading
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 from .. import db
 
@@ -167,14 +168,16 @@ class _UnionFind:
             self.parent[rb] = ra
 
 
-def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD) -> list[dict]:
+def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD, *, exact_only: bool = False) -> list[dict]:
     """Pure: records have id, doc_id, doc_created_at, start_page, end_page, date_of_service,
     record_type, text. Returns duplicate_groups rows {record_id, group_id, is_canonical, reason,
     score} for every member of a group of size >= 2; group_id is the canonical record id."""
+    image_rows = find_image_duplicates(records)
+    image_ids = {r["record_id"] for r in image_rows}
     seen: set[str] = set()
     items: list[_Item] = []
     for r in records:
-        if r["id"] in seen:
+        if r["id"] in seen or r["id"] in image_ids:
             continue
         seen.add(r["id"])
         it = _prepare(r)
@@ -192,7 +195,7 @@ def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD) -> l
     by_type: dict[str | None, list[_Item]] = defaultdict(list)
     for it in items:
         by_type[it.record_type].append(it)
-    for bucket in by_type.values():
+    for bucket in ([] if exact_only else by_type.values()):
         for i, a in enumerate(bucket):
             for b in bucket[i + 1:]:
                 if a.hash == b.hash or (a.date and b.date and a.date != b.date):
@@ -206,7 +209,7 @@ def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD) -> l
     groups: dict[str, list[_Item]] = defaultdict(list)
     for it in items:
         groups[uf.find(it.id)].append(it)
-    rows: list[dict] = []
+    rows: list[dict] = list(image_rows)
     for members in groups.values():
         if len(members) < 2:
             continue
@@ -226,6 +229,47 @@ def find_duplicates(records: list[dict], threshold: float = NEAR_THRESHOLD) -> l
     return rows
 
 
+def find_image_duplicates(records: list[dict]) -> list[dict]:
+    """Only complete, nonempty multisets may prove containment; never chain subsets."""
+    items = sorted({r["id"]: r for r in records}.values(),
+                   key=lambda r: _canonical_key(_prepare(r)))
+    assigned = set()
+    rows = []
+    for a in items:
+        if a["id"] in assigned:
+            continue
+        ah = a.get("image_hashes")
+        if not ah or len(ah) != a["end_page"] - a["start_page"] + 1 or not all(ah):
+            continue
+        members = []
+        for b in items:
+            if b["id"] == a["id"] or b["id"] in assigned:
+                continue
+            bh = b.get("image_hashes")
+            if not bh or len(bh) != b["end_page"] - b["start_page"] + 1 or not all(bh):
+                continue
+            if Counter(bh) <= Counter(ah):
+                reason = "exact_image" if Counter(bh) == Counter(ah) else "partial_exact"
+                members.append({"record_id": b["id"], "group_id": a["id"],
+                                "is_canonical": 0, "reason": reason, "score": 1.0})
+                assigned.add(b["id"])
+        if members:
+            assigned.add(a["id"])
+            rows.extend(members)
+            rows.append({"record_id": a["id"], "group_id": a["id"], "is_canonical": 1,
+                         "reason": "partial_exact" if any(m["reason"] == "partial_exact" for m in members)
+                         else "exact_image", "score": 1.0})
+    return rows
+
+
+def image_hash(path: str | None) -> str | None:
+    try:
+        data = Path(path).read_bytes() if path else b""
+        return hashlib.sha256(data).hexdigest() if data else None
+    except OSError:
+        return None
+
+
 # ---------- DB wrapper ----------
 
 def pairing_changed(before: dict | None, after: dict | None) -> bool:
@@ -236,7 +280,7 @@ def pairing_changed(before: dict | None, after: dict | None) -> bool:
     return any((b.get(k) or None) != (a.get(k) or None) for k in PAIRING_FIELDS)
 
 
-def dedupe_all() -> None:
+def dedupe_all(*, exact_only: bool = False) -> None:
     """Recompute duplicate groups over every done record of every document and store them.
     Effective date and type (user overrides applied) drive the pairing; hidden records are skipped.
     Records that are pending or failed (for example just re-grouped) take no part, so any row that
@@ -245,22 +289,26 @@ def dedupe_all() -> None:
     with _recompute_lock:
         overrides = db.get_overrides()
         page_text: dict[str, dict[int, str]] = {}
+        page_hashes = {}
         items: list[dict] = []
         for r in db.all_done_records():
             ov = overrides.get(r["id"]) or {}
             if ov.get("hidden"):
                 continue
             if r["doc_id"] not in page_text:
-                page_text[r["doc_id"]] = {p["page_no"]: p["text"] or "" for p in db.get_pages(r["doc_id"])}
+                source_pages = db.get_pages(r["doc_id"])
+                page_text[r["doc_id"]] = {p["page_no"]: p["text"] or "" for p in source_pages}
+                page_hashes[r["doc_id"]] = {p["page_no"]: image_hash(p["image_path"]) for p in source_pages}
             pages = page_text[r["doc_id"]]
             items.append({
                 "id": r["id"], "doc_id": r["doc_id"], "doc_created_at": r.get("doc_created_at"),
                 "start_page": r["start_page"], "end_page": r["end_page"],
                 "date_of_service": ov.get("date_of_service") or r.get("date_of_service"),
                 "record_type": ov.get("record_type") or r.get("record_type"),
+                "image_hashes": [page_hashes[r["doc_id"]].get(n) for n in range(r["start_page"], r["end_page"] + 1)],
                 "text": "\n".join(pages.get(n, "") for n in range(r["start_page"], r["end_page"] + 1)),
             })
-        rows = find_duplicates(items)
+        rows = find_duplicates(items, exact_only=exact_only)
         db.replace_duplicate_groups(rows)
     log.info("dedupe: %d records, %d duplicate groups, %d grouped records",
              len(items), len({row["group_id"] for row in rows}), len(rows))

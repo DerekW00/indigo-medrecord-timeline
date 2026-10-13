@@ -62,6 +62,7 @@ The target is 31/31 matched gold spans, including permitted internal partitions,
 - The only application model is `gpt-6-luna`. Calls use the existing OpenAI adapter and its validated JSON fallbacks.
 - Service dates take priority. Report/fax dates may be approximate fallbacks; birth and injury dates are not service dates.
 - A bundle can start mid-record. Fax page 2 with a complete heading may simply follow a removed cover sheet.
+- The preserved measured grouping patch normalizes fax timestamps, tolerates header drift while counters continue, and recognizes printed-page restarts inside a fax. The narrow new fix preserves printed page 1-to-2 continuity when classification drifts, unless a heading, fax reset, or conflicting service date says otherwise.
 - Source conflicts, laterality, restrictions, and uncertain dates remain matters for reviewer inspection. Do not silently resolve contradictory medical evidence.
 - Overrides remain attached to deterministic record IDs. A changed boundary creates a different record ID; edits are not automatically transferred to it.
 - Synthetic smoke results prove application behavior, not extraction accuracy. Medical artifacts and raw evaluation claims remain ignored and local.
